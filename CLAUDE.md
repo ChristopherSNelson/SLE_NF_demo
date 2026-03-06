@@ -138,10 +138,11 @@ Profiles are composable with commas. Always pair an executor with an environment
 - Cloud: must set `workDir` to `s3://` or `gs://` bucket in the profile
 - Clean up after successful run: `nextflow clean -f -before <run_name>`
 
-## Pipeline Architecture (11 processes)
+## Pipeline Architecture (12 processes)
 
 | # | Process | Tool | Inputs | Key Outputs |
 |---|---------|------|--------|-------------|
+| 0 | FETCH_SRA | fasterq-dump | SRR accession | Paired-end FASTQ.gz (skipped for local paths) |
 | 1 | FASTQC | fastqc | Raw FASTQs | HTML reports (per sample, per read) |
 | 2 | TRIM_GALORE | trim_galore | Raw FASTQs | Trimmed FASTQs + post-trim FastQC |
 | 3 | BWAMETH_INDEX | bwameth index | Genome FASTA | C2T converted index (6 files) |
@@ -154,20 +155,38 @@ Profiles are composable with commas. Always pair an executor with an environment
 | 10 | REGION_DETECT | Python (sklearn) | Corrected M-values + sample sheet | candidate_dmrs.bed, window_results.tsv, dmr_manhattan.png |
 | 11 | NMF_STRATIFY | Python (sklearn, NMF) | Corrected M-values + sample sheet | nmf_clusters.tsv, W/H matrices, rank_selection.png, nmf_umap.png |
 
+### Sample sheet format
+The sample sheet CSV supports two modes:
+
+**Local FASTQs** — provide paths to existing files:
+```csv
+sample_id,fastq_1,fastq_2,condition,batch
+SLE_01,/data/SLE_01_1.fastq.gz,/data/SLE_01_2.fastq.gz,SLE,batch1
+```
+
+**SRA accessions** — set fastq_1 to the SRR ID, leave fastq_2 empty:
+```csv
+sample_id,fastq_1,fastq_2,condition,batch
+SRR22476697,SRR22476697,,SLE,batch1
+```
+
+Both modes can be mixed in the same sample sheet. SRA rows are auto-detected by the `SRR` prefix and routed through `FETCH_SRA`; local rows go straight to QC.
+
 ### Data flow
 ```
-FASTQs ──► FASTQC
-  │
-  ▼
-TRIM_GALORE ──► BWAMETH_ALIGN ──► MARK_DUPLICATES ──► METHYLDACKEL
-                     ▲                                      │
-              BWAMETH_INDEX                                 ▼
-                                                      COMBAT_METH
-                                                       │    │   │
-                                                       ▼    ▼   ▼
-                                                     PCA  HOUSEMAN  REGION_DETECT
-                                                                        │
-                                                                   NMF_STRATIFY
+SRR accessions ──► FETCH_SRA ──┐
+                                ├──► FASTQs ──► FASTQC
+Local FASTQs ──────────────────┘       │
+                                       ▼
+                                 TRIM_GALORE ──► BWAMETH_ALIGN ──► MARK_DUPLICATES ──► METHYLDACKEL
+                                                      ▲                                      │
+                                               BWAMETH_INDEX                                 ▼
+                                                                                       COMBAT_METH
+                                                                                        │    │   │
+                                                                                        ▼    ▼   ▼
+                                                                                      PCA  HOUSEMAN  REGION_DETECT
+                                                                                                         │
+                                                                                                    NMF_STRATIFY
 ```
 
 ## File Structure
@@ -176,6 +195,7 @@ SLE_NF_demo/
 ├── main.nf                     # Entry workflow, channel wiring
 ├── nextflow.config             # Params, profiles (test, conda), resource defaults
 ├── modules/
+│   ├── fetch_sra.nf
 │   ├── fastqc.nf
 │   ├── trim_galore.nf
 │   ├── bwameth_index.nf
@@ -194,6 +214,7 @@ SLE_NF_demo/
 │   ├── region_detect.py
 │   └── nmf_stratify.py
 ├── envs/
+│   ├── sra_tools.yml           # sra-tools (fasterq-dump)
 │   ├── fastqc.yml              # fastqc
 │   ├── trim_galore.yml         # trim-galore, cutadapt
 │   ├── bwameth.yml             # bwa-meth, bwa, samtools
@@ -391,3 +412,11 @@ Test profile that:
 - Run `nextflow run main.nf -profile test,conda`
 - Verify all 11 processes complete
 - Check all expected outputs are produced
+
+## Git Commit Conventions
+
+All commits must include both co-authors:
+```
+Co-Authored-By: Chris Nelson <christopher.s.nelson.01@gmail.com>
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+```
