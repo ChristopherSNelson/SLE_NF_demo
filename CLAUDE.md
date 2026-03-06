@@ -254,20 +254,17 @@ SLE_NF_demo/
 
 ## Design Decisions
 
-### CRITICAL: Use ComBat-meth, NEVER plain ComBat for methylation data
+### CRITICAL: Use ComBatMet, NEVER plain ComBat for methylation data
 - **DO NOT call `sva::ComBat()` directly.** It is designed for gene expression, not methylation.
-- `bin/combat_meth.R` must use the **champ.ComBat** or equivalent ComBat-meth implementation
-  from the ChAMP Bioconductor package, which handles the bounded beta-value distribution
-  and the mean-variance relationship specific to methylation arrays/WGBS.
-- If ChAMP is not available via conda, implement the ComBat-meth algorithm manually:
-  1. Convert beta → M-values (logit transform)
-  2. Apply empirical Bayes batch correction on M-values with variance shrinkage
-     that respects the transformed scale
-  3. Back-transform to beta with bounds enforcement [0,1]
-  4. The key difference from plain ComBat: variance priors must account for the
-     heteroscedastic relationship between mean methylation and variance
-- This applies everywhere: module names, scripts, documentation, and comments
-- `bin/combat_meth.R` implements this algorithm directly — no sva dependency needed
+- `bin/combat_meth.R` uses the **ComBatMet** R package (Wang, 2025, NAR Genomics & Bioinformatics):
+  - GitHub: https://github.com/JmWangBio/ComBatMet
+  - Uses beta regression to estimate batch-free distributions
+  - Operates directly on beta values (bounded [0,1]), not M-values
+  - Realigns quantiles to corrected counterparts — proper for methylation data
+- The package is installed from GitHub via `remotes::install_github()` at first run
+- Main function: `ComBat_met(beta_matrix, batch = batch_vec, group = group_vec, full_mod = TRUE)`
+- After correction, beta values are logit-transformed to M-values for downstream stats/ML
+- `r-remotes` is included in `envs/r_methylation.yml` for GitHub installation
 
 ### M-values (not beta) for all statistics and ML
 - M-value = logit(beta) = log2(beta / (1 - beta))

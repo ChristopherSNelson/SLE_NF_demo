@@ -1,25 +1,28 @@
 #!/usr/bin/env Rscript
 
-# ComBat-meth: batch correction designed for DNA methylation data.
+# Batch correction for DNA methylation data using ComBatMet
+# (Wang, 2025, NAR Genomics and Bioinformatics)
+# https://github.com/JmWangBio/ComBatMet
 #
-# This implements the ComBat-meth algorithm (Niu et al., 2016) which differs
-# from plain ComBat (sva::ComBat, designed for gene expression) in key ways:
-#   1. Operates on M-values (logit-transformed beta) rather than raw beta
-#   2. Uses methylation-aware variance priors that account for the mean-variance
-#      relationship inherent to bounded methylation data
-#   3. Enforces beta-value bounds [0,1] on back-transformation
-#   4. Applies variance shrinkage using an inverse-gamma prior fitted to
-#      the observed batch-effect variances, weighted by probe-level variance
+# ComBatMet uses beta regression to estimate batch-free distributions and
+# realigns quantiles to their corrected counterparts. It operates directly
+# on beta values (not M-values), which is the correct approach for bounded
+# methylation data.
 #
-# DO NOT replace this with sva::ComBat() — that function assumes unbounded,
-# homoscedastic expression data and will produce biased corrections on
-# methylation M-values.
+# DO NOT replace with sva::ComBat() — that assumes unbounded expression data.
+
+# Install ComBatMet from GitHub if not already available
+if (!requireNamespace("ComBatMet", quietly = TRUE)) {
+  cat("Installing ComBatMet from GitHub...\n")
+  remotes::install_github("JmWangBio/ComBatMet", upgrade = "never", quiet = TRUE)
+}
 
 suppressPackageStartupMessages({
   library(optparse)
   library(data.table)
   library(dplyr)
   library(matrixStats)
+  library(ComBatMet)
 })
 
 option_list <- list(
@@ -77,137 +80,47 @@ variable_rows <- row_vars > 1e-6
 beta_mat <- beta_mat[variable_rows, ]
 cpg_info <- cpg_info[variable_rows, ]
 
+# Clamp beta to strict (0,1) — ComBatMet requires beta in open interval
+beta_mat <- pmin(pmax(beta_mat, 0.001), 0.999)
+
 cat("After filtering:", nrow(beta_mat), "CpG sites across", ncol(beta_mat), "samples\n")
 
-# --- Convert beta to M-values ---
-beta_clamped <- pmin(pmax(beta_mat, 0.001), 0.999)
-mvalues_raw <- log2(beta_clamped / (1 - beta_clamped))
+# --- Raw M-values (for PCA comparison) ---
+mvalues_raw <- log2(beta_mat / (1 - beta_mat))
 
-# --- ComBat-meth implementation ---
+# --- ComBatMet batch correction ---
 # Match sample order between matrix columns and sample sheet rows
 sample_order <- match(colnames(beta_mat), samples$sample_id)
 if (any(is.na(sample_order))) {
   sample_order <- match(colnames(beta_mat), basename(samples$sample_id))
 }
 batch_info <- samples$batch[sample_order]
+
+# Encode condition as numeric group vector for ComBat_met
 condition_info <- samples$condition[sample_order]
-
-combat_meth <- function(dat, batch, condition) {
-  # ComBat-meth: empirical Bayes batch correction for methylation M-values
-  #
-  # Unlike sva::ComBat which assumes homoscedastic variance across features,
-  # this implementation:
-  # - Estimates batch effects per probe on M-values
-  # - Uses probe-level variance estimates weighted by the inverse of the
-  #   mean-variance relationship (methylation-specific heteroscedasticity)
-  # - Applies shrinkage via moment-matched inverse-gamma priors
-  # - Enforces biological signal preservation via condition covariates
-
-  batches <- unique(batch)
-  n_batch <- length(batches)
-  n_probes <- nrow(dat)
-  n_samples <- ncol(dat)
-
-  # Design matrix: intercept + condition covariates
-  mod <- model.matrix(~factor(condition))
-
-  # Step 1: Standardize data — remove condition effects, estimate batch effects
-  # Fit OLS for each probe: M ~ condition
-  # Residuals contain batch effects + noise
-  beta_hat <- solve(t(mod) %*% mod) %*% t(mod) %*% t(dat)
-  fitted_vals <- t(mod %*% beta_hat)
-
-  # Grand mean per probe (across all samples)
-  grand_mean <- rowMeans(dat)
-
-  # Step 2: Estimate batch-specific location (gamma) and scale (delta) parameters
-  gamma_hat <- matrix(NA, n_probes, n_batch)
-  delta_hat <- matrix(NA, n_probes, n_batch)
-
-  for (b in seq_len(n_batch)) {
-    idx <- which(batch == batches[b])
-    residuals_b <- dat[, idx] - fitted_vals[, idx]
-    gamma_hat[, b] <- rowMeans(residuals_b)
-    delta_hat[, b] <- rowVars(residuals_b)
-  }
-
-  # Replace NA/zero variances with small positive value
-  delta_hat[is.na(delta_hat) | delta_hat < 1e-10] <- 1e-6
-
-  # Step 3: Empirical Bayes shrinkage with methylation-aware priors
-  # Fit inverse-gamma prior to delta_hat per batch using method of moments
-  # Weight by inverse of mean M-value magnitude (methylation-aware weighting)
-  # Probes near M=0 (beta ~0.5) have highest variance — downweight their
-  # contribution to the prior
-  probe_weights <- 1 / (1 + abs(grand_mean))
-  probe_weights <- probe_weights / sum(probe_weights) * n_probes
-
-  gamma_star <- matrix(NA, n_probes, n_batch)
-  delta_star <- matrix(NA, n_probes, n_batch)
-
-  for (b in seq_len(n_batch)) {
-    # Weighted mean and variance of gamma estimates (location prior)
-    w_gamma <- probe_weights
-    gamma_bar <- weighted.mean(gamma_hat[, b], w_gamma)
-    tau2 <- weighted.mean((gamma_hat[, b] - gamma_bar)^2, w_gamma)
-    if (tau2 < 1e-10) tau2 <- 1e-6
-
-    n_b <- sum(batch == batches[b])
-
-    # Shrink gamma toward grand mean
-    gamma_star[, b] <- (tau2 * gamma_hat[, b] + (delta_hat[, b] / n_b) * gamma_bar) /
-                        (tau2 + delta_hat[, b] / n_b)
-
-    # Inverse-gamma prior for delta (variance)
-    # Method of moments on log(delta) for numerical stability
-    log_delta <- log(delta_hat[, b])
-    w_delta <- probe_weights
-    m1 <- weighted.mean(log_delta, w_delta)
-    m2 <- weighted.mean((log_delta - m1)^2, w_delta)
-
-    # Inverse-gamma shape (alpha) and rate (beta_ig) from moments
-    alpha_ig <- (2 * m2 + m1^2 + 2) / m2  # approximate
-    beta_ig <- exp(m1) * (alpha_ig - 1)
-
-    if (!is.finite(alpha_ig) || alpha_ig <= 2) alpha_ig <- 3
-    if (!is.finite(beta_ig) || beta_ig <= 0) beta_ig <- exp(m1)
-
-    # Posterior mean of inverse-gamma
-    delta_star[, b] <- (beta_ig + 0.5 * n_b * delta_hat[, b]) /
-                        (alpha_ig + 0.5 * n_b - 1)
-  }
-
-  # Step 4: Apply correction
-  dat_corrected <- dat
-  for (b in seq_len(n_batch)) {
-    idx <- which(batch == batches[b])
-    pooled_var <- rowMeans(delta_hat)
-
-    for (j in idx) {
-      dat_corrected[, j] <- ((dat[, j] - gamma_star[, b]) *
-                              sqrt(pooled_var) / sqrt(delta_star[, b])) +
-                             grand_mean
-    }
-  }
-
-  # Step 5: Add back condition effects
-  dat_corrected <- dat_corrected + (fitted_vals - matrix(grand_mean, n_probes, n_samples))
-
-  return(dat_corrected)
-}
+group_numeric <- as.integer(factor(condition_info)) - 1L  # 0/1 encoding
 
 if (length(unique(batch_info)) > 1) {
-  cat("Applying ComBat-meth correction across", length(unique(batch_info)), "batches\n")
-  mvalues_corrected <- combat_meth(mvalues_raw, batch_info, condition_info)
+  cat("Applying ComBatMet correction across", length(unique(batch_info)), "batches\n")
+  cat("  Batches:", paste(unique(batch_info), collapse = ", "), "\n")
+  cat("  Groups:", paste(unique(condition_info), collapse = ", "), "\n")
+
+  beta_corrected <- ComBat_met(
+    beta_mat,
+    batch = batch_info,
+    group = group_numeric,
+    full_mod = TRUE
+  )
+
+  # Enforce bounds after correction
+  beta_corrected <- pmin(pmax(beta_corrected, 0.001), 0.999)
 } else {
-  cat("Only one batch detected — skipping ComBat-meth correction\n")
-  mvalues_corrected <- mvalues_raw
+  cat("Only one batch detected — skipping ComBatMet correction\n")
+  beta_corrected <- beta_mat
 }
 
-# --- Back-transform corrected M-values to beta ---
-# Enforce bounds: beta must be in [0.001, 0.999] to avoid degenerate values
-beta_corrected <- 2^mvalues_corrected / (1 + 2^mvalues_corrected)
-beta_corrected <- pmin(pmax(beta_corrected, 0.001), 0.999)
+# --- Convert corrected beta to M-values ---
+mvalues_corrected <- log2(beta_corrected / (1 - beta_corrected))
 
 # --- Write outputs ---
 write.table(mvalues_raw, file = file.path(opt$outdir, "mvalues_raw.tsv"),
@@ -218,4 +131,4 @@ saveRDS(beta_corrected, file = file.path(opt$outdir, "beta_matrix.rds"))
 write.table(cpg_info, file = file.path(opt$outdir, "cpg_manifest.tsv"),
             sep = "\t", quote = FALSE, row.names = FALSE)
 
-cat("ComBat-meth complete. Outputs written to", opt$outdir, "\n")
+cat("ComBatMet complete. Outputs written to", opt$outdir, "\n")
