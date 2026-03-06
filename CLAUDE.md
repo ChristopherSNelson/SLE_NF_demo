@@ -383,54 +383,59 @@ Common pitfalls when writing or modifying this pipeline. These apply to Nextflow
 - [x] `envs/r_methylation.yml`
 - [x] `envs/python_ml.yml`
 
-### TODO — Build in this order
+### COMPLETED
+- [x] All 12 Nextflow modules (modules/*.nf) including FETCH_SRA
+- [x] All 5 bin scripts (combat_meth.R, pca_plot.R, houseman_deconv.R, region_detect.py, nmf_stratify.py)
+- [x] main.nf — entry workflow with SRA/local branching
+- [x] conf/test.config — test profile
+- [x] bin/generate_test_data.py — simulated chr22 data generator
+- [x] Executor profiles (local/SLURM/AWS/GCloud) with crash recovery
+- [x] Fixed conda env specs for osx-arm64 compatibility
+- [x] Implemented proper ComBat-meth (no sva dependency)
 
-#### Step 1: Nextflow modules (modules/*.nf)
-Write all 11 DSL2 process definitions. Each module needs:
-- `conda` directive pointing to the correct `envs/*.yml`
-- Typed `input:` / `output:` blocks
-- `script:` block calling the tool or bin script
-- `publishDir` to `${params.outdir}/<stage>`
-- Resource `label`
+### Current status: FASTQC through METHYLDACKEL pass; COMBAT_METH fails on empty bedGraphs
 
-Files to create:
-1. `modules/fastqc.nf` — label process_low
-2. `modules/trim_galore.nf` — label process_low
-3. `modules/bwameth_index.nf` — label process_high (one-time, CPU-intensive)
-4. `modules/bwameth_align.nf` — label process_high
-5. `modules/mark_duplicates.nf` — label process_medium
-6. `modules/methyldackel.nf` — label process_medium, stage .fai explicitly
-7. `modules/combat_meth.nf` — label process_medium, collects ALL bedGraphs
-8. `modules/pca_plot.nf` — label process_low
-9. `modules/houseman_deconv.nf` — label process_low
-10. `modules/region_detect.nf` — label process_medium
-11. `modules/nmf_stratify.nf` — label process_medium
+### TODO — Next steps (in priority order)
 
-#### Step 2: Bin scripts (bin/*)
-Write the R and Python analysis scripts:
-1. `bin/combat_meth.R` — ComBat-meth (NOT plain ComBat), reads bedGraphs, outputs M-value matrix
-2. `bin/pca_plot.R` — 4 PCA PNGs, variance table
-3. `bin/houseman_deconv.R` — quadprog constrained projection, NOT minfi
-4. `bin/region_detect.py` — sliding window DMR detection, sub-population-aware
-5. `bin/nmf_stratify.py` — NMF consensus clustering, cophenetic+dispersion+silhouette, UMAP
+#### 1. Fix test data → MethylDackel producing empty bedGraphs
+- Root cause: simulated BS reads don't produce aligned CpG coverage
+- The bisulfite conversion in generate_test_data.py converts C→T which prevents
+  bwameth from aligning reads back to CpG sites with sufficient depth
+- Options:
+  a. **Generate pre-made bedGraphs** for the test profile — bypass alignment entirely
+     for testing downstream steps (ComBat → NMF). Most practical.
+  b. **Use real chr22 reads** — download a small subset of real WGBS data from SRA
+  c. **Fix the simulator** — need to model BS-seq alignment more carefully (bwameth
+     handles C→T conversion internally, so reads should align, but the random reference
+     may not have enough mappable CpGs at sufficient depth with only 5000 reads)
+- Recommended: option (a) for fast iteration, then (b) for real validation
 
-#### Step 3: main.nf
-Entry workflow that:
-- Parses sample sheet into channels
-- Wires all 11 processes together per the data flow diagram
-- Handles genome index (build if not cached)
-- Collects per-sample outputs for cohort-level processes (ComBat, PCA, etc.)
+#### 2. Consider fastp as alternative to FastQC + Trim Galore
+- fastp does QC + adapter trimming + quality filtering in a single pass
+- Faster than running FastQC then Trim Galore separately
+- Would consolidate two processes into one
+- Change: replace FASTQC + TRIM_GALORE modules with a single FASTP module
+- Adds `envs/fastp.yml` and removes `envs/fastqc.yml` + `envs/trim_galore.yml`
 
-#### Step 4: conf/test.config
-Test profile that:
-- Generates or points to small simulated chr22 FASTQ data (4 samples)
-- Sets reduced resource limits
-- Overrides params for fast execution (~5 min target)
+#### 3. Validate all downstream processes (ComBat-meth → NMF)
+- Once bedGraphs have data, verify:
+  - ComBat-meth R script runs without error
+  - PCA produces 4 PNG plots
+  - Houseman deconvolution completes
+  - Region detection finds candidate DMRs
+  - NMF produces rank selection and UMAP plots
+- Debug each failure individually
 
-#### Step 5: Validate
-- Run `nextflow run main.nf -profile test,conda`
-- Verify all 11 processes complete
-- Check all expected outputs are produced
+#### 4. End-to-end test with real data
+- Download small subset of SRP410780 (e.g., 2 SLE + 2 control, chr22 only)
+- Run full pipeline with `-profile conda`
+- Verify biologically plausible outputs
+
+#### 5. Polish
+- Add MultiQC summary step (optional process 13)
+- Add input validation (check sample sheet columns, genome file exists)
+- CI/CD: GitHub Actions workflow for test profile
+- Container definitions (Dockerfile / Singularity) for each env
 
 ## Git Commit Conventions
 
