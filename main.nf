@@ -9,6 +9,7 @@
 nextflow.enable.dsl = 2
 
 // --- Module imports ---
+include { FETCH_SRA }        from './modules/fetch_sra'
 include { FASTQC }           from './modules/fastqc'
 include { TRIM_GALORE }      from './modules/trim_galore'
 include { BWAMETH_INDEX }    from './modules/bwameth_index'
@@ -35,6 +36,7 @@ if (params.help) {
 
     Required:
       --sample_sheet   CSV with columns: sample_id, fastq_1, fastq_2, condition, batch
+                       For SRA downloads, set fastq_1 to an SRR accession and leave fastq_2 empty
       --genome         Path to reference genome FASTA
 
     Options:
@@ -61,14 +63,28 @@ if (!params.genome) {
 // --- Main workflow ---
 workflow {
 
-    // Parse sample sheet
+    // Parse sample sheet — split into SRA accessions vs local FASTQs
     Channel
         .fromPath(params.sample_sheet)
         .splitCsv(header: true)
-        .map { row ->
-            tuple(row.sample_id, [file(row.fastq_1), file(row.fastq_2)])
+        .branch { row ->
+            sra:   row.fastq_1 =~ /^SRR/ && (!row.fastq_2 || row.fastq_2 == '')
+            local: true
         }
-        .set { reads_ch }
+        .set { sample_rows }
+
+    // ---- Step 0: Fetch SRA data (if any) ----
+    sra_ch = sample_rows.sra
+        .map { row -> tuple(row.sample_id, row.fastq_1) }
+
+    FETCH_SRA(sra_ch)
+
+    // Local FASTQs
+    local_reads_ch = sample_rows.local
+        .map { row -> tuple(row.sample_id, [file(row.fastq_1), file(row.fastq_2)]) }
+
+    // Merge SRA-fetched reads with local reads
+    reads_ch = FETCH_SRA.out.reads.mix(local_reads_ch)
 
     // Sample sheet as file for cohort-level processes
     sample_sheet_ch = Channel.fromPath(params.sample_sheet)

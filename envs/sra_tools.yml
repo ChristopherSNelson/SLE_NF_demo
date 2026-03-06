@@ -1,0 +1,7 @@
+name: sra_tools
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - sra-tools>=3.0
