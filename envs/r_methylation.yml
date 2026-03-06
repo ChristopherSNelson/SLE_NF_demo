@@ -1,0 +1,16 @@
+name: r_methylation
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - conda-forge::r-base=4.3.2
+  - conda-forge::r-sva=3.50.0
+  - conda-forge::r-quadprog=1.5_8
+  - conda-forge::r-ggplot2=3.4.4
+  - conda-forge::r-data.table=1.15.0
+  - conda-forge::r-dplyr=1.1.4
+  - conda-forge::r-optparse=1.7.3
+  - conda-forge::r-matrixstats=1.2.0
+  - conda-forge::r-tidyr=1.3.0
+  - conda-forge::r-rcolorbrewer=1.1_3

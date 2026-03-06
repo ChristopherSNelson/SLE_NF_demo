@@ -1,0 +1,13 @@
+work/
+results/
+results_test/
+test_data/
+.nextflow/
+.nextflow.log*
+trace-*.txt
+timeline-*.html
+report-*.html
+dag-*.svg
+*.pyc
+__pycache__/
+.DS_Store

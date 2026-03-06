@@ -1,0 +1,9 @@
+name: bwameth
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - bioconda::bwameth=0.2.7
+  - bioconda::bwa=0.7.18
+  - bioconda::samtools=1.19
