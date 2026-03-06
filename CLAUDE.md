@@ -45,8 +45,10 @@ done
 ### How Nextflow manages dependencies
 - Each process declares a `conda` directive pointing to a YAML in `envs/`
 - When you run with `-profile conda`, Nextflow creates and caches envs in `work/conda/`
-- `conda.useMicromamba = true` is set in nextflow.config — micromamba is used instead of conda
-- No manual env creation needed; just have Nextflow + micromamba installed
+- Works with either **conda** or **micromamba** — set `conda.useMicromamba` in nextflow.config
+  - `conda.useMicromamba = true` → uses micromamba (faster solving, smaller footprint)
+  - `conda.useMicromamba = false` → uses standard conda (must be on PATH)
+- No manual env creation needed; just have Nextflow + one of conda/micromamba installed
 
 ## Current Dataset: SRP410780 (Demo/Validation Cohort)
 
@@ -138,6 +140,15 @@ Profiles are composable with commas. Always pair an executor with an environment
 - Cloud: must set `workDir` to `s3://` or `gs://` bucket in the profile
 - Clean up after successful run: `nextflow clean -f -before <run_name>`
 
+### Trace files & logging (enabled by default)
+All enabled in `nextflow.config` — no flags needed at runtime:
+- **Timeline** → `${outdir}/pipeline_info/timeline.html` — Gantt chart of process execution
+- **Report** → `${outdir}/pipeline_info/report.html` — resource usage summary per process
+- **Trace** → `${outdir}/pipeline_info/trace.txt` — TSV with per-task metrics (CPU%, peak RSS/VMem, I/O, duration)
+- **DAG** → `${outdir}/pipeline_info/dag.svg` — process dependency graph (requires Graphviz)
+- **Nextflow log** → `.nextflow.log` in the launch directory — full debug log, rotated automatically
+- Per-task logs in work dir: `.command.sh`, `.command.err`, `.command.out`, `.command.log`, `.exitcode`
+
 ## Pipeline Architecture (12 processes)
 
 | # | Process | Tool | Inputs | Key Outputs |
@@ -220,7 +231,7 @@ SLE_NF_demo/
 │   ├── bwameth.yml             # bwa-meth, bwa, samtools
 │   ├── picard.yml              # picard, samtools
 │   ├── methyldackel.yml        # methyldackel
-│   ├── r_methylation.yml       # R shared env: sva, quadprog, ggplot2, data.table, dplyr, optparse
+│   ├── r_methylation.yml       # R shared env: quadprog, ggplot2, data.table, dplyr, optparse, matrixStats
 │   └── python_ml.yml           # Python shared env: scikit-learn, numpy, pandas, umap-learn, matplotlib
 └── conf/
     └── test.config             # Test profile: simulated chr22 data, 4 samples
@@ -236,7 +247,7 @@ SLE_NF_demo/
 - All channels: bioconda, conda-forge, defaults
 
 ### R environment (`r_methylation.yml`) must include:
-- r-base, r-sva, r-quadprog, r-ggplot2, r-data.table, r-dplyr, r-optparse, r-matrixstats
+- r-base, r-quadprog, r-ggplot2, r-data.table, r-dplyr, r-optparse, r-matrixstats, r-tidyr
 
 ### Python environment (`python_ml.yml`) must include:
 - python, scikit-learn, numpy, pandas, scipy, matplotlib, seaborn, umap-learn
@@ -244,11 +255,19 @@ SLE_NF_demo/
 ## Design Decisions
 
 ### CRITICAL: Use ComBat-meth, NEVER plain ComBat for methylation data
-- Plain ComBat (sva::ComBat) is designed for gene expression and does NOT properly handle
-  the bounded nature of methylation data or the mean-variance relationship in beta/M-values
-- ComBat-meth is specifically designed for methylation data
+- **DO NOT call `sva::ComBat()` directly.** It is designed for gene expression, not methylation.
+- `bin/combat_meth.R` must use the **champ.ComBat** or equivalent ComBat-meth implementation
+  from the ChAMP Bioconductor package, which handles the bounded beta-value distribution
+  and the mean-variance relationship specific to methylation arrays/WGBS.
+- If ChAMP is not available via conda, implement the ComBat-meth algorithm manually:
+  1. Convert beta → M-values (logit transform)
+  2. Apply empirical Bayes batch correction on M-values with variance shrinkage
+     that respects the transformed scale
+  3. Back-transform to beta with bounds enforcement [0,1]
+  4. The key difference from plain ComBat: variance priors must account for the
+     heteroscedastic relationship between mean methylation and variance
 - This applies everywhere: module names, scripts, documentation, and comments
-- The R script should implement the ComBat-meth algorithm, not call sva::ComBat directly
+- `bin/combat_meth.R` implements this algorithm directly — no sva dependency needed
 
 ### M-values (not beta) for all statistics and ML
 - M-value = logit(beta) = log2(beta / (1 - beta))
@@ -289,7 +308,7 @@ These were all encountered and fixed during initial testing. They are baked into
 2. **Set `conda.useMicromamba = true`** — conda alone may not be on PATH
 3. **Stage .fai as explicit input** in METHYLDACKEL — declare `path fasta_fai` in input block
 4. **No `--ignore-flags` for MethylDackel** — flag is invalid; duplicates excluded by default after dedup
-5. **Full R package list in conda spec** — include r-optparse, r-data.table, r-dplyr (not just r-sva)
+5. **Full R package list in conda spec** — include r-optparse, r-data.table, r-dplyr, r-matrixstats
 6. **Skip bedGraph track header** — use `skip=1` in R `read.table()` calls for bedGraph input
 7. **No `aes_string()` in ggplot2** — deprecated; use `aes(.data[[variable]])` instead
 8. **No SVG outputs anywhere** — remove all SVG emit blocks from module output declarations

@@ -4,6 +4,6 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - bioconda::trim-galore=0.6.10
-  - bioconda::cutadapt=4.6
-  - bioconda::fastqc=0.12.1
+  - bioconda::trim-galore>=0.6.10
+  - bioconda::cutadapt>=5.0
+  - bioconda::fastqc>=0.12.1

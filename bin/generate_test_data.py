@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """
 Generate simulated chr22 bisulfite sequencing test data.
-Creates a small reference FASTA, paired-end FASTQs (4 samples), and sample sheet.
+Creates a small reference FASTA with planted CpG islands,
+paired-end FASTQs (4 samples), and sample sheet.
+
+The reference is designed to produce actual CpG coverage:
+- 10kb sequence with 3 CpG-dense regions (~20 CpGs each)
+- 5000 reads per sample concentrated on CpG regions
+- This ensures MethylDackel finds CpG sites with sufficient depth
 """
 
 import os
@@ -13,16 +19,43 @@ import argparse
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--outdir', default='test_data', help='Output directory')
-    parser.add_argument('--n_reads', type=int, default=1000, help='Reads per sample')
+    parser.add_argument('--n_reads', type=int, default=5000, help='Reads per sample')
     parser.add_argument('--read_len', type=int, default=100, help='Read length')
-    parser.add_argument('--ref_len', type=int, default=50000, help='Reference length')
     args = parser.parse_args()
 
     os.makedirs(args.outdir, exist_ok=True)
     random.seed(42)
 
-    # --- Generate chr22 reference ---
-    ref_seq = ''.join(random.choices('ACGT', k=args.ref_len))
+    # --- Generate reference with planted CpG islands ---
+    # Build a 10kb sequence with 3 CpG-rich regions
+    ref_len = 10000
+
+    # Start with random non-CpG bases (A, T only to avoid accidental CpGs)
+    ref_list = [random.choice('AT') for _ in range(ref_len)]
+
+    # Plant CpG islands at known positions
+    cpg_regions = [
+        (1000, 1500),   # Region 1: positions 1000-1500
+        (4000, 4500),   # Region 2: positions 4000-4500
+        (7000, 7500),   # Region 3: positions 7000-7500
+    ]
+
+    for start, end in cpg_regions:
+        pos = start
+        while pos < end - 1:
+            # Place CG dinucleotides every ~10-20 bp with some flanking sequence
+            ref_list[pos] = 'C'
+            ref_list[pos + 1] = 'G'
+            # Add some non-CpG context around it
+            gap = random.randint(8, 20)
+            pos += gap
+
+    ref_seq = ''.join(ref_list)
+
+    # Count actual CpGs for verification
+    n_cpgs = sum(1 for i in range(len(ref_seq) - 1) if ref_seq[i] == 'C' and ref_seq[i+1] == 'G')
+    print(f"Reference: {ref_len} bp with {n_cpgs} CpG sites")
+
     ref_path = os.path.join(args.outdir, 'chr22.fa')
     with open(ref_path, 'w') as f:
         f.write('>chr22\n')
@@ -32,10 +65,7 @@ def main():
     # Create .fai index
     fai_path = ref_path + '.fai'
     with open(fai_path, 'w') as f:
-        # chr22\tlength\toffset\tlinebases\tlinewidth
-        n_lines = (args.ref_len + 79) // 80
-        last_line = args.ref_len % 80 if args.ref_len % 80 != 0 else 80
-        f.write(f'chr22\t{args.ref_len}\t6\t80\t81\n')
+        f.write(f'chr22\t{ref_len}\t6\t80\t81\n')
 
     # --- Sample definitions ---
     samples = [
@@ -45,18 +75,18 @@ def main():
         {'sample_id': 'Control_02', 'condition': 'Control', 'batch': 'batch2'},
     ]
 
-    def bisulfite_convert(seq, conversion_rate=0.99):
-        """Simulate bisulfite conversion: C->T except at CpG sites (partially)."""
+    def bisulfite_convert(seq, methylation_rate=0.5):
+        """Simulate bisulfite conversion: C->T except at methylated CpG sites."""
         result = list(seq)
         for i in range(len(result)):
             if result[i] == 'C':
-                # If CpG context, partially convert based on methylation
                 if i + 1 < len(result) and result[i + 1] == 'G':
-                    if random.random() > 0.5:  # 50% methylation at CpGs
+                    # CpG context: convert only if unmethylated
+                    if random.random() > methylation_rate:
                         result[i] = 'T'
                 else:
-                    if random.random() < conversion_rate:
-                        result[i] = 'T'
+                    # Non-CpG C: always convert (bisulfite treatment)
+                    result[i] = 'T'
         return ''.join(result)
 
     def reverse_complement(seq):
@@ -75,19 +105,38 @@ def main():
         fq1_path = os.path.join(fastq_dir, f'{sid}_1.fastq.gz')
         fq2_path = os.path.join(fastq_dir, f'{sid}_2.fastq.gz')
 
+        # SLE samples have different methylation rates than controls
+        if sample['condition'] == 'SLE':
+            meth_rate = 0.3  # hypomethylated in SLE
+        else:
+            meth_rate = 0.7  # normal methylation in controls
+
         with gzip.open(fq1_path, 'wt') as fq1, gzip.open(fq2_path, 'wt') as fq2:
             for i in range(args.n_reads):
-                # Random fragment from reference
-                frag_len = random.randint(150, 300)
-                max_start = max(0, args.ref_len - frag_len)
-                start = random.randint(0, max_start)
-                fragment = ref_seq[start:start + frag_len]
+                # 80% of reads target CpG regions, 20% random
+                if random.random() < 0.8:
+                    # Pick a CpG region
+                    region_start, region_end = random.choice(cpg_regions)
+                    # Start read near the region
+                    frag_start = random.randint(
+                        max(0, region_start - args.read_len),
+                        min(region_end, ref_len - 200)
+                    )
+                else:
+                    frag_start = random.randint(0, ref_len - 200)
+
+                frag_len = random.randint(150, 200)
+                frag_end = min(frag_start + frag_len, ref_len)
+                fragment = ref_seq[frag_start:frag_end]
+
+                if len(fragment) < args.read_len:
+                    continue
 
                 # Read 1: forward, bisulfite converted
-                r1_seq = bisulfite_convert(fragment[:args.read_len])
+                r1_seq = bisulfite_convert(fragment[:args.read_len], meth_rate)
                 # Read 2: reverse complement of fragment end, bisulfite converted
                 r2_raw = reverse_complement(fragment[-args.read_len:])
-                r2_seq = bisulfite_convert(r2_raw)
+                r2_seq = bisulfite_convert(r2_raw, meth_rate)
 
                 qual1 = random_quality(args.read_len)
                 qual2 = random_quality(args.read_len)
@@ -109,6 +158,7 @@ def main():
     print(f"  Reference: {ref_path}")
     print(f"  Sample sheet: {csv_path}")
     print(f"  {len(samples)} samples x {args.n_reads} reads each")
+    print(f"  CpG regions: {cpg_regions}")
 
 
 if __name__ == '__main__':
