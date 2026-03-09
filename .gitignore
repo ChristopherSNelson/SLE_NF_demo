@@ -11,6 +11,8 @@ dag-*.svg
 *.pyc
 __pycache__/
 .DS_Store
+*.pages
+nf_run.log
 # Reference genomes and indices (too large for git)
 *.fa
 *.fa.fai
