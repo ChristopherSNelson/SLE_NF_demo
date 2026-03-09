@@ -162,7 +162,7 @@ All enabled in `nextflow.config` — no flags needed at runtime:
 
 | # | Process | Tool | Inputs | Key Outputs |
 |---|---------|------|--------|-------------|
-| 0 | FETCH_SRA | fasterq-dump | SRR accession | Paired-end FASTQ.gz (skipped for local paths) |
+| 0 | FETCH_SRA | fasterq-dump | SRR accession | Paired-end FASTQ.gz in `fastq_cache/` (persistent storeDir) |
 | 1 | FASTP | fastp | Raw FASTQs | Trimmed FASTQs + HTML/JSON QC reports |
 | 2 | BWAMETH_INDEX | bwameth index | Genome FASTA | C2T converted index (6 files) |
 | 3 | BWAMETH_ALIGN | bwameth | Trimmed FASTQs + index | Sorted BAMs + BAI + flagstat (not published) |
