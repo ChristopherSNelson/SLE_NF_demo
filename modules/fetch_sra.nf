@@ -1,7 +1,7 @@
 process FETCH_SRA {
     label 'process_medium'
     conda "${projectDir}/envs/sra_tools.yml"
-    publishDir "${params.outdir}/fastqs", mode: 'copy'
+    storeDir "${projectDir}/fastq_cache"
 
     input:
     tuple val(sample_id), val(srr_accession)

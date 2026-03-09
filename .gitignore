@@ -17,3 +17,5 @@ __pycache__/
 *.fa.gz
 # Run-specific results
 results_*/
+# Persistent SRA FASTQ cache
+fastq_cache/

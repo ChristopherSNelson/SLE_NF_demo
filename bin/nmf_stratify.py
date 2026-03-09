@@ -23,6 +23,7 @@ from scipy import stats
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 def parse_args():
@@ -103,25 +104,27 @@ def select_dmr_features(mval_df, dmr_bed_path, min_features=500):
         print("WARNING: No DMRs found. Falling back to top-variance selection.")
         return None
 
-    # Parse CpG coordinates from index (chr:pos format)
-    cpg_ids = mval_df.index.tolist()
-    cpg_chrs = []
-    cpg_pos = []
-    for cid in cpg_ids:
-        parts = cid.split(':')
-        cpg_chrs.append(parts[0])
-        cpg_pos.append(int(parts[1]))
+    # Parse CpG coordinates from index (chr:pos format) — vectorized
+    cpg_ids = mval_df.index.to_numpy()
+    split = np.char.split(cpg_ids.astype(str), ':')
+    cpg_chrs = np.array([s[0] for s in split])
+    cpg_pos = np.array([int(s[1]) for s in split])
 
-    cpg_coords = pd.DataFrame({'cpg_id': cpg_ids, 'chr': cpg_chrs, 'pos': cpg_pos})
+    # Vectorized DMR overlap: group DMRs by chromosome, then broadcast
+    dmr_cpg_mask = np.zeros(len(cpg_ids), dtype=bool)
+    for chrom, grp in dmr_df.groupby('chr'):
+        chr_mask = cpg_chrs == chrom
+        if not chr_mask.any():
+            continue
+        chr_pos = cpg_pos[chr_mask]
+        # Broadcasting: chr_pos (n,) vs DMR starts/ends (m,)
+        starts = grp['start'].values  # (m,)
+        ends = grp['end'].values      # (m,)
+        # (n, m) boolean matrix: CpG i falls within DMR j
+        in_dmr = (chr_pos[:, None] >= starts[None, :]) & (chr_pos[:, None] < ends[None, :])
+        dmr_cpg_mask[chr_mask] = in_dmr.any(axis=1)
 
-    # Find CpGs within any DMR
-    dmr_cpgs = set()
-    for _, dmr in dmr_df.iterrows():
-        mask = ((cpg_coords['chr'] == dmr['chr']) &
-                (cpg_coords['pos'] >= dmr['start']) &
-                (cpg_coords['pos'] < dmr['end']))
-        dmr_cpgs.update(cpg_coords.loc[mask, 'cpg_id'].tolist())
-
+    dmr_cpgs = set(cpg_ids[dmr_cpg_mask])
     print(f"Found {len(dmr_cpgs)} CpGs within {len(dmr_df)} DMR regions")
 
     if len(dmr_cpgs) < min_features:
@@ -356,33 +359,22 @@ def correlate_clinical(H_matrix, sample_ids, clinical_path, outdir):
 def plot_rank_selection(results, outdir):
     """Plot cophenetic, dispersion, and silhouette across ranks."""
     ks = sorted(results.keys())
-    coph = [results[k]['cophenetic'] for k in ks]
-    disp = [results[k]['dispersion'] for k in ks]
-    sil = [results[k]['silhouette'] for k in ks]
+    metrics_df = pd.DataFrame({
+        'k': ks * 3,
+        'value': ([results[k]['cophenetic'] for k in ks] +
+                  [results[k]['dispersion'] for k in ks] +
+                  [results[k]['silhouette'] for k in ks]),
+        'metric': ['Cophenetic'] * len(ks) + ['Dispersion'] * len(ks) + ['Silhouette'] * len(ks)
+    })
 
-    fig, axes = plt.subplots(1, 3, figsize=(14, 4))
-
-    axes[0].plot(ks, coph, 'o-', color='#1f77b4')
-    axes[0].set_xlabel('Rank (k)')
-    axes[0].set_ylabel('Cophenetic Correlation')
-    axes[0].set_title('Cophenetic Correlation')
-    axes[0].set_xticks(ks)
-
-    axes[1].plot(ks, disp, 's-', color='#ff7f0e')
-    axes[1].set_xlabel('Rank (k)')
-    axes[1].set_ylabel('Dispersion')
-    axes[1].set_title('Dispersion')
-    axes[1].set_xticks(ks)
-
-    axes[2].plot(ks, sil, '^-', color='#2ca02c')
-    axes[2].set_xlabel('Rank (k)')
-    axes[2].set_ylabel('Silhouette Score')
-    axes[2].set_title('Silhouette Score')
-    axes[2].set_xticks(ks)
-
-    plt.tight_layout()
-    fig.savefig(os.path.join(outdir, 'rank_selection.png'), dpi=150, bbox_inches='tight')
-    plt.close()
+    g = sns.FacetGrid(metrics_df, col='metric', sharey=False, height=4, aspect=1.2)
+    g.map_dataframe(sns.lineplot, x='k', y='value', marker='o')
+    g.set_axis_labels('Rank (k)', '')
+    g.set_titles('{col_name}')
+    for ax in g.axes.flat:
+        ax.set_xticks(ks)
+    g.savefig(os.path.join(outdir, 'rank_selection.png'), dpi=150, bbox_inches='tight')
+    plt.close('all')
 
 
 def plot_umap(H, assignments, samples, outdir):
@@ -392,25 +384,25 @@ def plot_umap(H, assignments, samples, outdir):
         reducer = UMAP(n_components=2, random_state=42, n_neighbors=min(5, H.shape[1] - 1))
         embedding = reducer.fit_transform(H.T)
     except (ImportError, Exception):
-        # Fallback to PCA if UMAP fails (e.g., too few samples)
         from sklearn.decomposition import PCA
         n_comp = min(2, H.shape[0], H.shape[1])
         pca = PCA(n_components=n_comp)
         embedding = pca.fit_transform(H.T)
 
+    plot_df = pd.DataFrame({
+        'UMAP1': embedding[:, 0],
+        'UMAP2': embedding[:, 1],
+        'Cluster': [str(a) for a in assignments],
+        'sample_id': samples
+    })
+
     fig, ax = plt.subplots(figsize=(7, 5))
-    scatter = ax.scatter(embedding[:, 0], embedding[:, 1],
-                          c=assignments, cmap='Set2', s=60, edgecolors='k', linewidth=0.5)
-    ax.set_xlabel('UMAP1')
-    ax.set_ylabel('UMAP2')
+    sns.scatterplot(data=plot_df, x='UMAP1', y='UMAP2', hue='Cluster',
+                    palette='Set2', s=80, edgecolor='k', linewidth=0.5, ax=ax)
+    for _, row in plot_df.iterrows():
+        ax.annotate(row['sample_id'], (row['UMAP1'], row['UMAP2']),
+                    fontsize=7, alpha=0.7, ha='center', va='bottom')
     ax.set_title('NMF Patient Clusters (UMAP)')
-
-    # Add sample labels
-    for i, sid in enumerate(samples):
-        ax.annotate(sid, (embedding[i, 0], embedding[i, 1]),
-                     fontsize=7, alpha=0.7, ha='center', va='bottom')
-
-    plt.colorbar(scatter, label='Cluster')
     fig.savefig(os.path.join(outdir, 'nmf_umap.png'), dpi=150, bbox_inches='tight')
     plt.close()
 
