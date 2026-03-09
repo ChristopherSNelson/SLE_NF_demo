@@ -311,6 +311,20 @@ SLE_NF_demo/
 - All three plotted together in rank_selection.png
 - UMAP visualization of H matrix colored by assigned cluster
 
+#### NMF enhancements (robustness)
+- **Cell-type regression**: Houseman cell fractions are regressed out of M-values before NMF.
+  Prevents clusters driven by cell-proportion differences rather than epigenetic subtypes.
+  NMF now depends on HOUSEMAN_DECONV output (changed pipeline DAG).
+- **DMR-based feature selection**: CpGs within candidate DMR regions are used instead of
+  top-variance CpGs. Falls back to variance-based selection if < 500 DMR CpGs found.
+  NMF now depends on REGION_DETECT output (changed pipeline DAG).
+- **LOO stability**: Leave-one-out analysis runs NMF n_samples times, removing one sample
+  each iteration. Reports cluster assignment consistency across iterations. Critical for
+  small cohorts (n=11) where a single sample can drive cluster structure.
+- **Clinical metadata correlation** (optional): If `--clinical_metadata` TSV is provided,
+  correlates H-matrix factor weights with numeric clinical variables (e.g., SLEDAI, age).
+  Outputs `clinical_correlations.tsv`. Code is ready for when metadata becomes available.
+
 ### PCA plots
 - 4 plots: {raw, corrected} x {colored by batch, colored by condition}
 - PNG only, no SVG output

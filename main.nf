@@ -48,7 +48,8 @@ if (params.help) {
       --window_size    DMR window size [default: ${params.window_size}]
       --step_size      DMR step size [default: ${params.step_size}]
       --min_cpgs       DMR min CpGs per window [default: ${params.min_cpgs}]
-      --alignment_only Stop after methylation extraction (skip cohort steps) [default: false]
+      --alignment_only      Stop after methylation extraction (skip cohort steps) [default: false]
+      --clinical_metadata   TSV with numeric clinical variables for NMF correlation [default: none]
     """.stripIndent()
     exit 0
 }
@@ -189,9 +190,12 @@ workflow {
         )
 
         // ---- Step 11: NMF patient stratification ----
+        // Now receives cell fractions (for regression) and DMRs (for feature selection)
         NMF_STRATIFY(
             COMBAT_METH.out.mvalues_corrected,
-            sample_sheet_ch.first()
+            sample_sheet_ch.first(),
+            HOUSEMAN_DECONV.out.fractions,
+            REGION_DETECT.out.dmrs
         )
     }
 }
