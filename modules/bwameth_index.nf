@@ -1,7 +1,7 @@
 process BWAMETH_INDEX {
     label 'process_high'
     conda "${projectDir}/envs/bwameth.yml"
-    // Index is intermediate — no publishDir (stays in work/ for resume)
+    storeDir "${projectDir}/genome_index"
 
     input:
     path genome

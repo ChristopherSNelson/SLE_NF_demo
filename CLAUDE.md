@@ -164,7 +164,7 @@ All enabled in `nextflow.config` — no flags needed at runtime:
 |---|---------|------|--------|-------------|
 | 0 | FETCH_SRA | fasterq-dump | SRR accession | Paired-end FASTQ.gz in `fastq_cache/` (persistent storeDir) |
 | 1 | FASTP | fastp | Raw FASTQs | Trimmed FASTQs + HTML/JSON QC reports |
-| 2 | BWAMETH_INDEX | bwameth index | Genome FASTA | C2T converted index (6 files) |
+| 2 | BWAMETH_INDEX | bwameth index | Genome FASTA | C2T converted index in `genome_index/` (persistent storeDir) |
 | 3 | BWAMETH_ALIGN | bwameth | Trimmed FASTQs + index | Sorted BAMs + BAI + flagstat (not published) |
 | 5 | MARK_DUPLICATES | picard MarkDuplicates | Sorted BAMs | Dedup BAMs + BAI + metrics (only metrics published) |
 | 5b | BAM_TO_CRAM | samtools view -C | Dedup BAMs + genome + .fai | CRAMs + CRAI (40-60% smaller than BAM) |
@@ -358,7 +358,8 @@ These were all encountered and fixed during initial testing. They are baked into
 17. **BH correction: don't depend on statsmodels** — implement Benjamini-Hochberg directly with numpy to avoid adding another conda dependency
 18. **dmrseq GRanges → data.frame**: `as.data.frame(dmrs)` returns S4 DFrame, not base data.frame. Extract fields with `GenomicRanges::mcols()` and build data.frame manually
 19. **dmrseq column names**: dmrseq uses `pval`/`qval`, not `pvalue`/`qvalue`. Check both naming conventions
-20. **fasterq-dump disk limit**: Add `--temp . --disk-limit-tmp 0` to prevent "disk-limit exceeded" errors in Nextflow work dirs
+20. **fasterq-dump APFS disk limit**: sra-tools 3.2.1 doesn't recognize APFS (`fs_type=unexpected`), defaults to tiny disk limit. `--disk-limit-tmp` doesn't help. Fix: use `prefetch` first to download .sra file, then `fasterq-dump` on the local file
+21. **Use `storeDir` for expensive deterministic tasks**: `publishDir` copies outputs; `work/` is tied to task hash (any script/config change invalidates cache). `storeDir` is a persistent cache — if output files exist, the task is skipped entirely. Use for: genome indexing (`genome_index/`), SRA downloads (`fastq_cache/`). Immune to script changes, work dir cleanups, and hash mismatches
 
 ## Nextflow DSL2 Gotchas
 
@@ -476,12 +477,12 @@ Test command: `nextflow run main.nf -profile test,conda`
 - [x] REGION_DETECT takes raw bedGraphs, runs parallel with COMBAT_METH
 - [x] dmrseq + bsseq auto-installed from Bioconductor at runtime (conda can't resolve arm64)
 - [x] GRanges S4 output bug fixed (extract mcols manually into base data.frame)
-- [x] fasterq-dump disk-limit fix (`--temp . --disk-limit-tmp 0`)
+- [x] fasterq-dump APFS disk-limit fix (prefetch + fasterq-dump on local .sra file)
 - [x] Input validation: sample sheet columns + genome file existence
 
 ### Overnight single-sample run results (SRR22476697)
 - BWAMETH_INDEX completed (2h 45m) — genome index is cached for future runs
-- FETCH_SRA failed: fasterq-dump disk-limit exceeded (now fixed with `--temp . --disk-limit-tmp 0`)
+- FETCH_SRA failed: fasterq-dump APFS disk-limit bug (fixed with prefetch + local fasterq-dump)
 - Need to re-run with the fix to complete alignment test
 
 ### TODO — Next steps (in priority order)

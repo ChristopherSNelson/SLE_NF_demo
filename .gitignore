@@ -19,5 +19,6 @@ nf_run.log
 *.fa.gz
 # Run-specific results
 results_*/
-# Persistent SRA FASTQ cache
+# Persistent caches (storeDir)
 fastq_cache/
+genome_index/
