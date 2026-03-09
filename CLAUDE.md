@@ -509,8 +509,9 @@ Switch with `/model` in Claude Code, or start sessions with `claude --model clau
 
 ## Git Commit Conventions
 
-All commits must include both co-authors:
+All commits must include both co-authors. Use the actual model name from the environment (check `$CLAUDE_MODEL` or the session info — e.g. `claude-sonnet-4-6`, `claude-opus-4-6`):
 ```
 Co-Authored-By: Chris Nelson <christopher.s.nelson.01@gmail.com>
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ```
+Replace `Sonnet 4.6` with the actual model being used if different.
