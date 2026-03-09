@@ -172,7 +172,7 @@ All enabled in `nextflow.config` — no flags needed at runtime:
 | 7 | COMBAT_METH | R (ComBat-meth) | bedGraphs + sample sheet | mvalues_corrected.tsv, beta_matrix.rds, cpg_manifest.tsv |
 | 8 | PCA_PLOT | R (ggplot2) | M-value matrices + sample sheet | 4 PNGs (raw/corrected x batch/condition) + pca_variance.tsv |
 | 9 | HOUSEMAN_DECONV | R (quadprog) | Beta matrix + reference panel | cell_fractions.tsv + cell_fractions.png |
-| 10 | REGION_DETECT | Python (sklearn) | Corrected M-values + sample sheet | candidate_dmrs.bed, window_results.tsv, dmr_manhattan.png |
+| 10 | REGION_DETECT | R (dmrseq) | Raw bedGraphs + sample sheet | candidate_dmrs.bed, window_results.tsv, dmr_manhattan.png |
 | 11 | NMF_STRATIFY | Python (sklearn, NMF) | Corrected M-values + sample sheet + cell fractions + DMRs | nmf_clusters.tsv, W/H matrices, rank_selection.png, nmf_umap.png, stability_loo.tsv |
 
 ### Sample sheet format
@@ -296,11 +296,15 @@ SLE_NF_demo/
 - Implement constrained least-squares projection using quadprog directly
 - Reference panel: use pre-built methylation profiles for major blood cell types
 
-### Region detection: sub-population-aware approach
-- Sliding window over CpGs, not naive t-test
-- Use mixed-effects or stratified test to handle patient sub-population correlation
-- Low-signal case-control associations are expected in SLE — method must be sensitive to subtle effects
-- Output: candidate DMR BED file with window-level statistics
+### Region detection: dmrseq (Korthauer et al., 2019)
+- Uses **dmrseq** R package — state-of-the-art count-level DMR detection
+- Works on raw MethylDackel bedGraphs (count_m + count_u), not M-values
+- Builds BSseq object from bedGraph files, runs dmrseq with batch as `adjustCovariate`
+- Produces variable-width DMRs with permutation-based p-values
+- REGION_DETECT runs in parallel with COMBAT_METH (both take raw bedGraphs)
+- dmrseq + bsseq installed from Bioconductor at runtime (conda can't resolve for osx-arm64)
+- GRanges output converted to plain data.frame to avoid S4 method dispatch issues
+- Output: candidate DMR BED file + window_results.tsv + manhattan plot
 
 ### NMF patient stratification
 - Sweep k=2..8
@@ -352,6 +356,9 @@ These were all encountered and fixed during initial testing. They are baked into
 15. **`Math.min()` doesn't work on Nextflow MemoryUnit** — use `[4.GB * task.attempt, 16.GB].min()` (Groovy collection min) instead of `Math.min(4.GB * task.attempt, 16.GB)`
 16. **Picard MarkDuplicates needs JVM memory cap** — without `-Xmx`, Picard grabs all available heap and OOMs on 16 GB machines. Use `picard -Xmx${avail_mem}g` + `MAX_RECORDS_IN_RAM=500000`
 17. **BH correction: don't depend on statsmodels** — implement Benjamini-Hochberg directly with numpy to avoid adding another conda dependency
+18. **dmrseq GRanges → data.frame**: `as.data.frame(dmrs)` returns S4 DFrame, not base data.frame. Extract fields with `GenomicRanges::mcols()` and build data.frame manually
+19. **dmrseq column names**: dmrseq uses `pval`/`qval`, not `pvalue`/`qvalue`. Check both naming conventions
+20. **fasterq-dump disk limit**: Add `--temp . --disk-limit-tmp 0` to prevent "disk-limit exceeded" errors in Nextflow work dirs
 
 ## Nextflow DSL2 Gotchas
 
@@ -464,14 +471,25 @@ Test command: `nextflow run main.nf -profile test,conda`
 - [x] Optional `--clinical_metadata` for H-matrix correlation (code ready, waiting for data)
 - [x] Pipeline DAG updated: NMF depends on HOUSEMAN_DECONV + REGION_DETECT
 
-### Current status: Overnight single-sample real-data run in progress (SRR22476697)
+### COMPLETED
+- [x] dmrseq (Korthauer 2019) for DMR detection — replaced Python sliding window
+- [x] REGION_DETECT takes raw bedGraphs, runs parallel with COMBAT_METH
+- [x] dmrseq + bsseq auto-installed from Bioconductor at runtime (conda can't resolve arm64)
+- [x] GRanges S4 output bug fixed (extract mcols manually into base data.frame)
+- [x] fasterq-dump disk-limit fix (`--temp . --disk-limit-tmp 0`)
+- [x] Input validation: sample sheet columns + genome file existence
+
+### Overnight single-sample run results (SRR22476697)
+- BWAMETH_INDEX completed (2h 45m) — genome index is cached for future runs
+- FETCH_SRA failed: fasterq-dump disk-limit exceeded (now fixed with `--temp . --disk-limit-tmp 0`)
+- Need to re-run with the fix to complete alignment test
 
 ### TODO — Next steps (in priority order)
 
-#### 1. Validate overnight run results
-- Check CRAM, bedGraph, metrics from SRR22476697
+#### 1. Re-run overnight single-sample alignment (SRR22476697)
+- Index is cached, should skip straight to FETCH_SRA + FASTP + alignment
+- Verify CRAM, bedGraph, metrics after completion
 - Review peak memory from trace.txt
-- Confirm MethylDackel produces non-empty bedGraphs from real data
 
 #### 2. Run full 11-sample cohort on AWS
 - Build and push 4 Docker images to ECR (see `docs/aws_setup.md`)
@@ -479,15 +497,8 @@ Test command: `nextflow run main.nf -profile test,conda`
 - Run `samples_full.csv` with `-profile aws`
 - Estimated cost: $44-58 on Spot instances
 
-#### 3. Build remaining Docker images
-- `sle-bwameth` (combined bioinformatics tools)
-- `sle-python-ml` (scikit-learn, numpy, pandas, umap-learn)
-- `sle-sra-tools` (fasterq-dump)
-- All need `aws` CLI for S3 file staging on AWS Batch
-
-#### 4. Polish
+#### 3. Polish
 - Add MultiQC summary step
-- Add input validation (check sample sheet columns, genome file exists)
 - CI/CD: GitHub Actions workflow for test profile
 
 ## Git Commit Conventions

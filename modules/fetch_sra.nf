@@ -14,6 +14,8 @@ process FETCH_SRA {
     fasterq-dump \\
         --split-files \\
         --threads ${task.cpus} \\
+        --temp . \\
+        --disk-limit-tmp 0 \\
         ${srr_accession}
 
     gzip ${srr_accession}_1.fastq ${srr_accession}_2.fastq

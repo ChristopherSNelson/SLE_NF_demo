@@ -23,3 +23,7 @@ dependencies:
   - conda-forge::r-betareg
   - conda-forge::r-aod
   - conda-forge::r-rcpparmadillo
+  # dmrseq dependencies (dmrseq itself installed from Bioconductor at runtime)
+  - bioconda::bioconductor-biocgenerics
+  - bioconda::bioconductor-genomicranges
+  - bioconda::bioconductor-biocparallel

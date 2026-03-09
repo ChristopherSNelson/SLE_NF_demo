@@ -203,9 +203,9 @@ workflow {
             sample_sheet_ch.first()
         )
 
-        // ---- Step 10: Region detection (DMRs) ----
+        // ---- Step 10: Region detection (dmrseq on raw counts) ----
         REGION_DETECT(
-            COMBAT_METH.out.mvalues_corrected,
+            bedgraphs_ch,
             sample_sheet_ch.first()
         )
 

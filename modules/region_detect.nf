@@ -1,10 +1,10 @@
 process REGION_DETECT {
     label 'process_medium'
-    conda "${projectDir}/envs/python_ml.yml"
+    conda "${projectDir}/envs/r_methylation.yml"
     publishDir "${params.outdir}/region_detect", mode: 'copy'
 
     input:
-    path mvalues_corrected
+    path bedgraphs
     path sample_sheet
 
     output:
@@ -13,13 +13,11 @@ process REGION_DETECT {
     path "dmr_manhattan.png",     emit: plot
 
     script:
+    def bg_list = bedgraphs.collect { it.name }.join(',')
     """
-    region_detect.py \\
-        --mvalues ${mvalues_corrected} \\
+    region_detect.R \\
+        --bedgraphs ${bg_list} \\
         --sample_sheet ${sample_sheet} \\
-        --window_size ${params.window_size} \\
-        --step_size ${params.step_size} \\
-        --min_cpgs ${params.min_cpgs} \\
         --outdir .
     """
 }

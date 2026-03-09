@@ -33,8 +33,8 @@ RUN install2.r --error --skipinstalled --ncpus -1 \
     RcppArmadillo \
     BiocManager
 
-# Install Bioconductor sva
-RUN R -e "BiocManager::install('sva', ask = FALSE, update = FALSE)"
+# Install Bioconductor packages (sva, dmrseq, bsseq)
+RUN R -e "BiocManager::install(c('sva', 'dmrseq', 'bsseq'), ask = FALSE, update = FALSE)"
 
 # Install ComBatMet from GitHub (pre-compiled, no runtime compilation needed)
 RUN R -e "remotes::install_github('JmWangBio/ComBatMet', upgrade = 'never')"
@@ -54,6 +54,8 @@ RUN R -e "\
     library(RcppArmadillo); \
     library(sva); \
     library(ComBatMet); \
+    library(dmrseq); \
+    library(bsseq); \
     message('All packages loaded successfully')"
 
 ENV PATH="/usr/local/bin:${PATH}"
