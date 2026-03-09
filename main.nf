@@ -62,6 +62,26 @@ if (!params.genome) {
     error "Please provide --genome"
 }
 
+// Validate sample sheet exists and has required columns
+def ss_file = file(params.sample_sheet)
+if (!ss_file.exists()) {
+    error "Sample sheet not found: ${params.sample_sheet}"
+}
+def ss_header = ss_file.readLines()[0].split(',') as List
+def required_cols = ['sample_id', 'fastq_1', 'fastq_2', 'condition', 'batch']
+def missing_cols = required_cols.findAll { !ss_header.contains(it) }
+if (missing_cols) {
+    error "Sample sheet missing required columns: ${missing_cols.join(', ')}. Found: ${ss_header.join(', ')}"
+}
+
+// Validate genome exists (skip for S3/GCS paths)
+if (!params.genome.startsWith('s3://') && !params.genome.startsWith('gs://')) {
+    def genome_file = file(params.genome)
+    if (!genome_file.exists()) {
+        error "Genome file not found: ${params.genome}"
+    }
+}
+
 // --- Main workflow ---
 workflow {
 
