@@ -312,6 +312,9 @@ These were all encountered and fixed during initial testing. They are baked into
 9. **Houseman via quadprog** — do NOT use minfi; Bioconductor compilation fails in conda
 10. **Include scikit-learn in conda spec** — needed by region_detect.py
 11. **Cap NMF k_max** — `k_max = min(k_max, n_samples - 1)` to prevent silhouette crash
+12. **ComBatMet needs ≥3 samples per batch** — with only 2 per batch, beta regression can't estimate within-batch variance (subscript out of bounds)
+13. **gcc version mismatch in conda** — R built with gcc 13.3.0 but conda installs 13.4.0; `combat_meth.R` auto-creates a symlink to fix this
+14. **cxx-compiler + gfortran + llvm-openmp required** in `r_methylation.yml` — without these, `updog` (ComBatMet dep) fails to compile from source
 
 ## Nextflow DSL2 Gotchas
 
@@ -390,22 +393,28 @@ Common pitfalls when writing or modifying this pipeline. These apply to Nextflow
 - [x] Fixed conda env specs for osx-arm64 compatibility
 - [x] Implemented proper ComBat-meth (no sva dependency)
 
-### Current status: FASTQC through METHYLDACKEL pass; COMBAT_METH fails on empty bedGraphs
+### COMPLETED
+- [x] Pre-made bedGraphs bypass alignment for downstream testing (`--skip_alignment`)
+- [x] 6 test samples (3 SLE + 3 Control, 2 batches) for ComBatMet variance estimation
+- [x] Fixed ComBatMet installation: `cxx-compiler`, `gfortran`, `llvm-openmp` in conda
+- [x] Auto-symlink for gcc version mismatch in `combat_meth.R` (13.3.0 → 13.4.0)
+- [x] All 5 downstream processes validated: ComBat-meth, PCA, Houseman, Region Detect, NMF
+
+### Current status: Full downstream pipeline passes with test profile
+
+Test command: `nextflow run main.nf -profile test,conda`
+- Skips alignment (uses pre-made bedGraphs)
+- Runs ComBat-meth → PCA → Houseman → Region Detect → NMF
+- NMF cleanly separates SLE from Control (silhouette=0.953 at k=2)
 
 ### TODO — Next steps (in priority order)
 
-#### 1. Fix test data → MethylDackel producing empty bedGraphs
-- Root cause: simulated BS reads don't produce aligned CpG coverage
-- The bisulfite conversion in generate_test_data.py converts C→T which prevents
-  bwameth from aligning reads back to CpG sites with sufficient depth
-- Options:
-  a. **Generate pre-made bedGraphs** for the test profile — bypass alignment entirely
-     for testing downstream steps (ComBat → NMF). Most practical.
-  b. **Use real chr22 reads** — download a small subset of real WGBS data from SRA
-  c. **Fix the simulator** — need to model BS-seq alignment more carefully (bwameth
-     handles C→T conversion internally, so reads should align, but the random reference
-     may not have enough mappable CpGs at sufficient depth with only 5000 reads)
-- Recommended: option (a) for fast iteration, then (b) for real validation
+#### 1. Container image for R methylation env
+- ComBatMet installation from GitHub is fragile (compiles 23 R packages from source)
+- Requires gcc/gfortran version symlinks, OpenMP libs — breaks across systems
+- **Build a Docker image** with all R deps + ComBatMet pre-installed
+- Add `Dockerfile` and configure in nextflow.config for `-profile docker`
+- This is the highest priority for reproducibility on new machines
 
 #### 2. Consider fastp as alternative to FastQC + Trim Galore
 - fastp does QC + adapter trimming + quality filtering in a single pass
@@ -414,25 +423,16 @@ Common pitfalls when writing or modifying this pipeline. These apply to Nextflow
 - Change: replace FASTQC + TRIM_GALORE modules with a single FASTP module
 - Adds `envs/fastp.yml` and removes `envs/fastqc.yml` + `envs/trim_galore.yml`
 
-#### 3. Validate all downstream processes (ComBat-meth → NMF)
-- Once bedGraphs have data, verify:
-  - ComBat-meth R script runs without error
-  - PCA produces 4 PNG plots
-  - Houseman deconvolution completes
-  - Region detection finds candidate DMRs
-  - NMF produces rank selection and UMAP plots
-- Debug each failure individually
-
-#### 4. End-to-end test with real data
+#### 3. End-to-end test with real data
 - Download small subset of SRP410780 (e.g., 2 SLE + 2 control, chr22 only)
-- Run full pipeline with `-profile conda`
-- Verify biologically plausible outputs
+- Run full pipeline with `-profile conda` (no skip_alignment)
+- Verify biologically plausible outputs from real WGBS data
 
-#### 5. Polish
+#### 4. Polish
 - Add MultiQC summary step (optional process 13)
 - Add input validation (check sample sheet columns, genome file exists)
 - CI/CD: GitHub Actions workflow for test profile
-- Container definitions (Dockerfile / Singularity) for each env
+- Container definitions for all envs (not just R)
 
 ## Git Commit Conventions
 

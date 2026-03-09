@@ -63,79 +63,95 @@ if (!params.genome) {
 // --- Main workflow ---
 workflow {
 
-    // Parse sample sheet — split into SRA accessions vs local FASTQs
-    Channel
-        .fromPath(params.sample_sheet)
-        .splitCsv(header: true)
-        .branch { row ->
-            sra:   row.fastq_1 =~ /^SRR/ && (!row.fastq_2 || row.fastq_2 == '')
-            local: true
-        }
-        .set { sample_rows }
-
-    // ---- Step 0: Fetch SRA data (if any) ----
-    sra_ch = sample_rows.sra
-        .map { row -> tuple(row.sample_id, row.fastq_1) }
-
-    FETCH_SRA(sra_ch)
-
-    // Local FASTQs
-    local_reads_ch = sample_rows.local
-        .map { row -> tuple(row.sample_id, [file(row.fastq_1), file(row.fastq_2)]) }
-
-    // Merge SRA-fetched reads with local reads
-    reads_ch = FETCH_SRA.out.reads.mix(local_reads_ch)
-
     // Sample sheet as file for cohort-level processes
     sample_sheet_ch = Channel.fromPath(params.sample_sheet)
 
-    // Reference genome
-    genome_ch = Channel.fromPath(params.genome)
+    if (params.skip_alignment) {
+        // ---- Skip alignment mode ----
+        // Use pre-made bedGraph files (e.g., from test data generator)
+        log.info "Skipping alignment — using pre-made bedGraphs from: ${params.bedgraph_dir}"
 
-    // Genome index (.fai) — derive from genome path if not provided
-    if (params.genome_fai) {
-        fai_ch = Channel.fromPath(params.genome_fai)
+        if (!params.bedgraph_dir) {
+            error "skip_alignment=true requires --bedgraph_dir"
+        }
+
+        bedgraphs_ch = Channel
+            .fromPath("${params.bedgraph_dir}/*_CpG.bedGraph")
+            .collect()
+
     } else {
-        fai_ch = Channel.fromPath("${params.genome}.fai")
+        // ---- Full pipeline: FASTQ → alignment → methylation calling ----
+
+        // Parse sample sheet — split into SRA accessions vs local FASTQs
+        Channel
+            .fromPath(params.sample_sheet)
+            .splitCsv(header: true)
+            .branch { row ->
+                sra:   row.fastq_1 =~ /^SRR/ && (!row.fastq_2 || row.fastq_2 == '')
+                local: true
+            }
+            .set { sample_rows }
+
+        // ---- Step 0: Fetch SRA data (if any) ----
+        sra_ch = sample_rows.sra
+            .map { row -> tuple(row.sample_id, row.fastq_1) }
+
+        FETCH_SRA(sra_ch)
+
+        // Local FASTQs
+        local_reads_ch = sample_rows.local
+            .map { row -> tuple(row.sample_id, [file(row.fastq_1), file(row.fastq_2)]) }
+
+        // Merge SRA-fetched reads with local reads
+        reads_ch = FETCH_SRA.out.reads.mix(local_reads_ch)
+
+        // Reference genome
+        genome_ch = Channel.fromPath(params.genome)
+
+        // Genome index (.fai) — derive from genome path if not provided
+        if (params.genome_fai) {
+            fai_ch = Channel.fromPath(params.genome_fai)
+        } else {
+            fai_ch = Channel.fromPath("${params.genome}.fai")
+        }
+
+        // ---- Step 1: QC ----
+        FASTQC(reads_ch)
+
+        // ---- Step 2: Trim ----
+        TRIM_GALORE(reads_ch)
+
+        // ---- Step 3: Index genome ----
+        BWAMETH_INDEX(genome_ch)
+
+        // ---- Step 4: Align ----
+        BWAMETH_ALIGN(
+            TRIM_GALORE.out.trimmed_reads,
+            genome_ch.first(),
+            BWAMETH_INDEX.out.index.first()
+        )
+
+        // ---- Step 5: Mark duplicates ----
+        MARK_DUPLICATES(BWAMETH_ALIGN.out.bam)
+
+        // ---- Step 6: Methylation extraction ----
+        dedup_bam_bai = MARK_DUPLICATES.out.bam
+            .join(MARK_DUPLICATES.out.bai)
+            .map { sample_id, bam, bai -> tuple(sample_id, bam, bai) }
+
+        METHYLDACKEL(
+            dedup_bam_bai,
+            genome_ch.first(),
+            fai_ch.first()
+        )
+
+        // Collect all bedGraphs (strip sample_id, just get the files)
+        bedgraphs_ch = METHYLDACKEL.out.bedgraph
+            .map { sample_id, bg -> bg }
+            .collect()
     }
 
-    // ---- Step 1: QC ----
-    FASTQC(reads_ch)
-
-    // ---- Step 2: Trim ----
-    TRIM_GALORE(reads_ch)
-
-    // ---- Step 3: Index genome ----
-    BWAMETH_INDEX(genome_ch)
-
-    // ---- Step 4: Align ----
-    BWAMETH_ALIGN(
-        TRIM_GALORE.out.trimmed_reads,
-        genome_ch.first(),
-        BWAMETH_INDEX.out.index.first()
-    )
-
-    // ---- Step 5: Mark duplicates ----
-    MARK_DUPLICATES(BWAMETH_ALIGN.out.bam)
-
-    // ---- Step 6: Methylation extraction ----
-    // Join dedup BAM with its BAI by sample_id
-    dedup_bam_bai = MARK_DUPLICATES.out.bam
-        .join(MARK_DUPLICATES.out.bai)
-        .map { sample_id, bam, bai -> tuple(sample_id, bam, bai) }
-
-    METHYLDACKEL(
-        dedup_bam_bai,
-        genome_ch.first(),
-        fai_ch.first()
-    )
-
     // ---- Step 7: ComBat-meth batch correction ----
-    // Collect all bedGraphs (strip sample_id, just get the files)
-    bedgraphs_ch = METHYLDACKEL.out.bedgraph
-        .map { sample_id, bg -> bg }
-        .collect()
-
     COMBAT_METH(
         bedgraphs_ch,
         sample_sheet_ch.first()

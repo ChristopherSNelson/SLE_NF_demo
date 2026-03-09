@@ -14,3 +14,12 @@ dependencies:
   - conda-forge::r-tidyr>=1.3
   - conda-forge::r-rcolorbrewer>=1.1
   - conda-forge::r-remotes>=2.4
+  # C++ compiler toolchain (needed to install R packages from source)
+  - conda-forge::cxx-compiler
+  - conda-forge::llvm-openmp
+  - conda-forge::gfortran
+  # ComBatMet dependencies (installed from GitHub, but needs compiled deps pre-built)
+  - bioconda::bioconductor-sva
+  - conda-forge::r-betareg
+  - conda-forge::r-aod
+  - conda-forge::r-rcpparmadillo

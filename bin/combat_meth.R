@@ -14,6 +14,26 @@
 # Install ComBatMet from GitHub if not already available
 if (!requireNamespace("ComBatMet", quietly = TRUE)) {
   cat("Installing ComBatMet from GitHub...\n")
+
+  # Fix gcc version mismatch in conda: R may expect a different minor version
+  # of gfortran libs than what's installed. Create a symlink if needed.
+  r_home <- R.home()
+  gcc_dir <- file.path(dirname(dirname(r_home)), "lib", "gcc", "arm64-apple-darwin20.0.0")
+  if (dir.exists(gcc_dir)) {
+    existing <- list.dirs(gcc_dir, recursive = FALSE, full.names = FALSE)
+    makeconf <- readLines(file.path(r_home, "etc", "Makeconf"), warn = FALSE)
+    expected <- regmatches(makeconf, regexpr("gcc/arm64-apple-darwin20\\.0\\.0/[0-9.]+", makeconf))
+    if (length(expected) > 0) {
+      expected_ver <- sub(".*/", "", expected[1])
+      if (!expected_ver %in% existing && length(existing) > 0) {
+        target <- file.path(gcc_dir, expected_ver)
+        source <- file.path(gcc_dir, existing[1])
+        cat(sprintf("Symlinking gcc %s -> %s for Fortran libs\n", expected_ver, existing[1]))
+        file.symlink(source, target)
+      }
+    }
+  }
+
   remotes::install_github("JmWangBio/ComBatMet", upgrade = "never", quiet = TRUE)
 }
 
