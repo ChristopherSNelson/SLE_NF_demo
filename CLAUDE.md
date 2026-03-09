@@ -173,7 +173,7 @@ All enabled in `nextflow.config` — no flags needed at runtime:
 | 8 | PCA_PLOT | R (ggplot2) | M-value matrices + sample sheet | 4 PNGs (raw/corrected x batch/condition) + pca_variance.tsv |
 | 9 | HOUSEMAN_DECONV | R (quadprog) | Beta matrix + reference panel | cell_fractions.tsv + cell_fractions.png |
 | 10 | REGION_DETECT | Python (sklearn) | Corrected M-values + sample sheet | candidate_dmrs.bed, window_results.tsv, dmr_manhattan.png |
-| 11 | NMF_STRATIFY | Python (sklearn, NMF) | Corrected M-values + sample sheet | nmf_clusters.tsv, W/H matrices, rank_selection.png, nmf_umap.png |
+| 11 | NMF_STRATIFY | Python (sklearn, NMF) | Corrected M-values + sample sheet + cell fractions + DMRs | nmf_clusters.tsv, W/H matrices, rank_selection.png, nmf_umap.png, stability_loo.tsv |
 
 ### Sample sheet format
 The sample sheet CSV supports two modes:
@@ -195,18 +195,19 @@ Both modes can be mixed in the same sample sheet. SRA rows are auto-detected by 
 ### Data flow
 ```
 SRR accessions ──► FETCH_SRA ──┐
-                                ├──► FASTQs ──► FASTQC
-Local FASTQs ──────────────────┘       │
-                                       ▼
-                                 TRIM_GALORE ──► BWAMETH_ALIGN ──► MARK_DUPLICATES ──► METHYLDACKEL
-                                                      ▲                                      │
-                                               BWAMETH_INDEX                                 ▼
-                                                                                       COMBAT_METH
-                                                                                        │    │   │
-                                                                                        ▼    ▼   ▼
-                                                                                      PCA  HOUSEMAN  REGION_DETECT
-                                                                                                         │
-                                                                                                    NMF_STRATIFY
+                                ├──► FASTQs ──► FASTP
+Local FASTQs ──────────────────┘                  │
+                                                  ▼
+                                            BWAMETH_ALIGN ──► MARK_DUPLICATES ──► BAM_TO_CRAM ──► METHYLDACKEL
+                                                 ▲                                                      │
+                                          BWAMETH_INDEX                                                 ▼
+                                                                                                  COMBAT_METH
+                                                                                                   │    │   │
+                                                                                                   ▼    ▼   ▼
+                                                                                                 PCA  HOUSEMAN  REGION_DETECT
+                                                                                                         │         │
+                                                                                                         ▼         ▼
+                                                                                                        NMF_STRATIFY
 ```
 
 ## File Structure
@@ -455,6 +456,13 @@ Test command: `nextflow run main.nf -profile test,conda`
 - [x] AWS setup guide (`docs/aws_setup.md`)
 - [x] Full 11-sample CSV (`samples_full.csv`)
 - [x] Work directory cleanup script (`bin/cleanup_work.sh`)
+
+### COMPLETED
+- [x] NMF cell-type regression (regress out Houseman fractions before clustering)
+- [x] NMF DMR-based feature selection (use DMR CpGs, fallback to top-variance if < 500)
+- [x] NMF leave-one-out stability analysis (outputs stability_loo.tsv)
+- [x] Optional `--clinical_metadata` for H-matrix correlation (code ready, waiting for data)
+- [x] Pipeline DAG updated: NMF depends on HOUSEMAN_DECONV + REGION_DETECT
 
 ### Current status: Overnight single-sample real-data run in progress (SRR22476697)
 
