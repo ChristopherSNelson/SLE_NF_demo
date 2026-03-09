@@ -146,12 +146,15 @@ def main():
         return
 
     # Multiple testing correction (Benjamini-Hochberg)
-    from statsmodels.stats.multitest import multipletests
-    try:
-        _, results['p_adjusted'], _, _ = multipletests(results['p_value'], method='fdr_bh')
-    except ImportError:
-        # Fallback: Bonferroni
-        results['p_adjusted'] = np.minimum(results['p_value'] * len(results), 1.0)
+    pvals = results['p_value'].values
+    n_tests = len(pvals)
+    ranked = np.argsort(pvals)
+    adj = np.empty(n_tests)
+    adj[ranked] = np.minimum(1.0, pvals[ranked] * n_tests / (np.arange(n_tests) + 1))
+    # Enforce monotonicity (BH step-up: work backwards from largest rank)
+    for i in range(n_tests - 2, -1, -1):
+        adj[ranked[i]] = min(adj[ranked[i]], adj[ranked[i + 1]])
+    results['p_adjusted'] = adj
 
     # Write full window results
     results.to_csv(os.path.join(args.outdir, 'window_results.tsv'), sep='\t', index=False)

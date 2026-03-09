@@ -149,7 +149,7 @@ All enabled in `nextflow.config` — no flags needed at runtime:
 - **Nextflow log** → `.nextflow.log` in the launch directory — full debug log, rotated automatically
 - Per-task logs in work dir: `.command.sh`, `.command.err`, `.command.out`, `.command.log`, `.exitcode`
 
-## Pipeline Architecture (12 processes)
+## Pipeline Architecture (13 processes)
 
 | # | Process | Tool | Inputs | Key Outputs |
 |---|---------|------|--------|-------------|
@@ -157,9 +157,10 @@ All enabled in `nextflow.config` — no flags needed at runtime:
 | 1 | FASTQC | fastqc | Raw FASTQs | HTML reports (per sample, per read) |
 | 2 | TRIM_GALORE | trim_galore | Raw FASTQs | Trimmed FASTQs + post-trim FastQC |
 | 3 | BWAMETH_INDEX | bwameth index | Genome FASTA | C2T converted index (6 files) |
-| 4 | BWAMETH_ALIGN | bwameth | Trimmed FASTQs + index | Sorted BAMs + BAI + flagstat |
-| 5 | MARK_DUPLICATES | picard MarkDuplicates | Sorted BAMs | Dedup BAMs + BAI + metrics |
-| 6 | METHYLDACKEL | MethylDackel extract | Dedup BAMs + genome + .fai | CpG bedGraphs + M-bias reports |
+| 4 | BWAMETH_ALIGN | bwameth | Trimmed FASTQs + index | Sorted BAMs + BAI + flagstat (not published) |
+| 5 | MARK_DUPLICATES | picard MarkDuplicates | Sorted BAMs | Dedup BAMs + BAI + metrics (only metrics published) |
+| 5b | BAM_TO_CRAM | samtools view -C | Dedup BAMs + genome + .fai | CRAMs + CRAI (40-60% smaller than BAM) |
+| 6 | METHYLDACKEL | MethylDackel extract | CRAMs + genome + .fai | CpG bedGraphs + M-bias reports |
 | 7 | COMBAT_METH | R (ComBat-meth) | bedGraphs + sample sheet | mvalues_corrected.tsv, beta_matrix.rds, cpg_manifest.tsv |
 | 8 | PCA_PLOT | R (ggplot2) | M-value matrices + sample sheet | 4 PNGs (raw/corrected x batch/condition) + pca_variance.tsv |
 | 9 | HOUSEMAN_DECONV | R (quadprog) | Beta matrix + reference panel | cell_fractions.tsv + cell_fractions.png |

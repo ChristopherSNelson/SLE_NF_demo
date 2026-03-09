@@ -1,7 +1,7 @@
 process BWAMETH_ALIGN {
     label 'process_high'
     conda "${projectDir}/envs/bwameth.yml"
-    publishDir "${params.outdir}/bwameth_align", mode: 'copy'
+    // No publishDir — intermediate BAMs replaced by CRAMs downstream
 
     input:
     tuple val(sample_id), path(reads)

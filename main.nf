@@ -15,6 +15,7 @@ include { TRIM_GALORE }      from './modules/trim_galore'
 include { BWAMETH_INDEX }    from './modules/bwameth_index'
 include { BWAMETH_ALIGN }    from './modules/bwameth_align'
 include { MARK_DUPLICATES }  from './modules/mark_duplicates'
+include { BAM_TO_CRAM }     from './modules/bam_to_cram'
 include { METHYLDACKEL }     from './modules/methyldackel'
 include { COMBAT_METH }      from './modules/combat_meth'
 include { PCA_PLOT }          from './modules/pca_plot'
@@ -134,13 +135,24 @@ workflow {
         // ---- Step 5: Mark duplicates ----
         MARK_DUPLICATES(BWAMETH_ALIGN.out.bam)
 
-        // ---- Step 6: Methylation extraction ----
+        // ---- Step 5b: Convert BAM → CRAM (40-60% smaller) ----
         dedup_bam_bai = MARK_DUPLICATES.out.bam
             .join(MARK_DUPLICATES.out.bai)
             .map { sample_id, bam, bai -> tuple(sample_id, bam, bai) }
 
-        METHYLDACKEL(
+        BAM_TO_CRAM(
             dedup_bam_bai,
+            genome_ch.first(),
+            fai_ch.first()
+        )
+
+        // ---- Step 6: Methylation extraction (from CRAMs) ----
+        cram_crai = BAM_TO_CRAM.out.cram
+            .join(BAM_TO_CRAM.out.crai)
+            .map { sample_id, cram, crai -> tuple(sample_id, cram, crai) }
+
+        METHYLDACKEL(
+            cram_crai,
             genome_ch.first(),
             fai_ch.first()
         )

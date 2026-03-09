@@ -1,7 +1,7 @@
 process MARK_DUPLICATES {
     label 'process_medium'
     conda "${projectDir}/envs/picard.yml"
-    publishDir "${params.outdir}/mark_duplicates", mode: 'copy'
+    publishDir "${params.outdir}/mark_duplicates", mode: 'copy', pattern: '*.dup_metrics.txt'
 
     input:
     tuple val(sample_id), path(bam)

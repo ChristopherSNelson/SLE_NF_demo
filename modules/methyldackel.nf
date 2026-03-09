@@ -4,7 +4,7 @@ process METHYLDACKEL {
     publishDir "${params.outdir}/methyldackel", mode: 'copy'
 
     input:
-    tuple val(sample_id), path(bam), path(bai)
+    tuple val(sample_id), path(aln), path(aln_idx)
     path genome
     path fasta_fai
 
@@ -14,13 +14,13 @@ process METHYLDACKEL {
 
     script:
     """
-    MethylDackel mbias ${genome} ${bam} ${sample_id}_mbias
+    MethylDackel mbias ${genome} ${aln} ${sample_id}_mbias
 
     MethylDackel extract \\
         --minDepth ${params.min_depth} \\
         -o ${sample_id} \\
         ${genome} \\
-        ${bam}
+        ${aln}
 
     # Rename default output to expected name
     if [ -f "${sample_id}_CpG.bedGraph" ]; then
