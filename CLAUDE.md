@@ -502,10 +502,15 @@ Test command: `nextflow run main.nf -profile test,conda`
 - Add MultiQC summary step
 - CI/CD: GitHub Actions workflow for test profile
 
+## Claude Model
+
+Use **Claude Sonnet 4.6** for this project (cost savings over Opus).
+Switch with `/model` in Claude Code, or start sessions with `claude --model claude-sonnet-4-6`.
+
 ## Git Commit Conventions
 
 All commits must include both co-authors:
 ```
 Co-Authored-By: Chris Nelson <christopher.s.nelson.01@gmail.com>
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ```
