@@ -10,8 +10,7 @@ nextflow.enable.dsl = 2
 
 // --- Module imports ---
 include { FETCH_SRA }        from './modules/fetch_sra'
-include { FASTQC }           from './modules/fastqc'
-include { TRIM_GALORE }      from './modules/trim_galore'
+include { FASTP }             from './modules/fastp'
 include { BWAMETH_INDEX }    from './modules/bwameth_index'
 include { BWAMETH_ALIGN }    from './modules/bwameth_align'
 include { MARK_DUPLICATES }  from './modules/mark_duplicates'
@@ -117,26 +116,23 @@ workflow {
             fai_ch = Channel.fromPath("${params.genome}.fai")
         }
 
-        // ---- Step 1: QC ----
-        FASTQC(reads_ch)
+        // ---- Step 1: QC + Trim (fastp) ----
+        FASTP(reads_ch)
 
-        // ---- Step 2: Trim ----
-        TRIM_GALORE(reads_ch)
-
-        // ---- Step 3: Index genome ----
+        // ---- Step 2: Index genome ----
         BWAMETH_INDEX(genome_ch)
 
-        // ---- Step 4: Align ----
+        // ---- Step 3: Align ----
         BWAMETH_ALIGN(
-            TRIM_GALORE.out.trimmed_reads,
+            FASTP.out.trimmed_reads,
             genome_ch.first(),
             BWAMETH_INDEX.out.index.first()
         )
 
-        // ---- Step 5: Mark duplicates ----
+        // ---- Step 4: Mark duplicates ----
         MARK_DUPLICATES(BWAMETH_ALIGN.out.bam)
 
-        // ---- Step 5b: Convert BAM → CRAM (40-60% smaller) ----
+        // ---- Step 4b: Convert BAM → CRAM (40-60% smaller) ----
         dedup_bam_bai = MARK_DUPLICATES.out.bam
             .join(MARK_DUPLICATES.out.bai)
             .map { sample_id, bam, bai -> tuple(sample_id, bam, bai) }
@@ -147,7 +143,7 @@ workflow {
             fai_ch.first()
         )
 
-        // ---- Step 6: Methylation extraction (from CRAMs) ----
+        // ---- Step 5: Methylation extraction (from CRAMs) ----
         cram_crai = BAM_TO_CRAM.out.cram
             .join(BAM_TO_CRAM.out.crai)
             .map { sample_id, cram, crai -> tuple(sample_id, cram, crai) }

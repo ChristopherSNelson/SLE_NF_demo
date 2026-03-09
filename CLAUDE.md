@@ -158,15 +158,14 @@ All enabled in `nextflow.config` — no flags needed at runtime:
 - **Nextflow log** → `.nextflow.log` in the launch directory — full debug log, rotated automatically
 - Per-task logs in work dir: `.command.sh`, `.command.err`, `.command.out`, `.command.log`, `.exitcode`
 
-## Pipeline Architecture (13 processes)
+## Pipeline Architecture (12 processes)
 
 | # | Process | Tool | Inputs | Key Outputs |
 |---|---------|------|--------|-------------|
 | 0 | FETCH_SRA | fasterq-dump | SRR accession | Paired-end FASTQ.gz (skipped for local paths) |
-| 1 | FASTQC | fastqc | Raw FASTQs | HTML reports (per sample, per read) |
-| 2 | TRIM_GALORE | trim_galore | Raw FASTQs | Trimmed FASTQs + post-trim FastQC |
-| 3 | BWAMETH_INDEX | bwameth index | Genome FASTA | C2T converted index (6 files) |
-| 4 | BWAMETH_ALIGN | bwameth | Trimmed FASTQs + index | Sorted BAMs + BAI + flagstat (not published) |
+| 1 | FASTP | fastp | Raw FASTQs | Trimmed FASTQs + HTML/JSON QC reports |
+| 2 | BWAMETH_INDEX | bwameth index | Genome FASTA | C2T converted index (6 files) |
+| 3 | BWAMETH_ALIGN | bwameth | Trimmed FASTQs + index | Sorted BAMs + BAI + flagstat (not published) |
 | 5 | MARK_DUPLICATES | picard MarkDuplicates | Sorted BAMs | Dedup BAMs + BAI + metrics (only metrics published) |
 | 5b | BAM_TO_CRAM | samtools view -C | Dedup BAMs + genome + .fai | CRAMs + CRAI (40-60% smaller than BAM) |
 | 6 | METHYLDACKEL | MethylDackel extract | CRAMs + genome + .fai | CpG bedGraphs + M-bias reports |
@@ -214,14 +213,18 @@ Local FASTQs ──────────────────┘       │
 ```
 SLE_NF_demo/
 ├── main.nf                     # Entry workflow, channel wiring
-├── nextflow.config             # Params, profiles (test, conda), resource defaults
+├── nextflow.config             # Params, profiles (test, conda, aws), resource defaults
+├── samples_single.csv          # Single-sample CSV for alignment testing
+├── samples_full.csv            # Full 11-sample SRP410780 cohort
 ├── modules/
 │   ├── fetch_sra.nf
-│   ├── fastqc.nf
-│   ├── trim_galore.nf
+│   ├── fastp.nf                # QC + trimming (replaces fastqc + trim_galore)
+│   ├── fastqc.nf               # (legacy, kept for reference)
+│   ├── trim_galore.nf          # (legacy, kept for reference)
 │   ├── bwameth_index.nf
 │   ├── bwameth_align.nf
 │   ├── mark_duplicates.nf
+│   ├── bam_to_cram.nf
 │   ├── methyldackel.nf
 │   ├── combat_meth.nf
 │   ├── pca_plot.nf
@@ -233,18 +236,24 @@ SLE_NF_demo/
 │   ├── pca_plot.R
 │   ├── houseman_deconv.R
 │   ├── region_detect.py
-│   └── nmf_stratify.py
+│   ├── nmf_stratify.py
+│   ├── generate_test_data.py
+│   └── cleanup_work.sh        # Purge work dir, keep conda cache
 ├── envs/
 │   ├── sra_tools.yml           # sra-tools (fasterq-dump)
-│   ├── fastqc.yml              # fastqc
-│   ├── trim_galore.yml         # trim-galore, cutadapt
+│   ├── fastp.yml               # fastp (QC + trimming)
 │   ├── bwameth.yml             # bwa-meth, bwa, samtools
 │   ├── picard.yml              # picard, samtools
 │   ├── methyldackel.yml        # methyldackel
 │   ├── r_methylation.yml       # R shared env: quadprog, ggplot2, data.table, dplyr, optparse, matrixStats
 │   └── python_ml.yml           # Python shared env: scikit-learn, numpy, pandas, umap-learn, matplotlib
+├── containers/
+│   └── r_methylation/
+│       └── Dockerfile          # Pre-built ComBatMet + all R deps
+├── docs/
+│   └── aws_setup.md            # Step-by-step AWS Batch deployment guide
 └── conf/
-    └── test.config             # Test profile: simulated chr22 data, 4 samples
+    └── test.config             # Test profile: simulated chr22 data, 6 samples
 ```
 
 ## Dependency Strategy
@@ -420,32 +429,44 @@ Test command: `nextflow run main.nf -profile test,conda`
 - Runs ComBat-meth → PCA → Houseman → Region Detect → NMF
 - NMF cleanly separates SLE from Control (silhouette=0.953 at k=2)
 
+### COMPLETED
+- [x] R methylation Dockerfile with pre-built ComBatMet (`containers/r_methylation/Dockerfile`)
+- [x] Replaced FASTQC + Trim Galore with single FASTP process
+- [x] `--alignment_only` mode for single-sample alignment testing
+- [x] Picard JVM memory cap (`-Xmx` + `MAX_RECORDS_IN_RAM`)
+- [x] Fixed `Math.min()` on Nextflow MemoryUnit types
+- [x] BH multiple testing correction (removed statsmodels dependency)
+- [x] BAM→CRAM conversion (40-60% storage savings)
+- [x] AWS Batch profile with Spot instances and raised resource caps
+- [x] AWS setup guide (`docs/aws_setup.md`)
+- [x] Full 11-sample CSV (`samples_full.csv`)
+- [x] Work directory cleanup script (`bin/cleanup_work.sh`)
+
+### Current status: Overnight single-sample real-data run in progress (SRR22476697)
+
 ### TODO — Next steps (in priority order)
 
-#### 1. Container image for R methylation env
-- ComBatMet installation from GitHub is fragile (compiles 23 R packages from source)
-- Requires gcc/gfortran version symlinks, OpenMP libs — breaks across systems
-- **Build a Docker image** with all R deps + ComBatMet pre-installed
-- Add `Dockerfile` and configure in nextflow.config for `-profile docker`
-- This is the highest priority for reproducibility on new machines
+#### 1. Validate overnight run results
+- Check CRAM, bedGraph, metrics from SRR22476697
+- Review peak memory from trace.txt
+- Confirm MethylDackel produces non-empty bedGraphs from real data
 
-#### 2. Consider fastp as alternative to FastQC + Trim Galore
-- fastp does QC + adapter trimming + quality filtering in a single pass
-- Faster than running FastQC then Trim Galore separately
-- Would consolidate two processes into one
-- Change: replace FASTQC + TRIM_GALORE modules with a single FASTP module
-- Adds `envs/fastp.yml` and removes `envs/fastqc.yml` + `envs/trim_galore.yml`
+#### 2. Run full 11-sample cohort on AWS
+- Build and push 4 Docker images to ECR (see `docs/aws_setup.md`)
+- Set up AWS Batch infrastructure (IAM, S3, compute env, job queue)
+- Run `samples_full.csv` with `-profile aws`
+- Estimated cost: $44-58 on Spot instances
 
-#### 3. End-to-end test with real data
-- Download small subset of SRP410780 (e.g., 2 SLE + 2 control, chr22 only)
-- Run full pipeline with `-profile conda` (no skip_alignment)
-- Verify biologically plausible outputs from real WGBS data
+#### 3. Build remaining Docker images
+- `sle-bwameth` (combined bioinformatics tools)
+- `sle-python-ml` (scikit-learn, numpy, pandas, umap-learn)
+- `sle-sra-tools` (fasterq-dump)
+- All need `aws` CLI for S3 file staging on AWS Batch
 
 #### 4. Polish
-- Add MultiQC summary step (optional process 13)
+- Add MultiQC summary step
 - Add input validation (check sample sheet columns, genome file exists)
 - CI/CD: GitHub Actions workflow for test profile
-- Container definitions for all envs (not just R)
 
 ## Git Commit Conventions
 
