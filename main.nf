@@ -49,6 +49,7 @@ if (params.help) {
       --window_size    DMR window size [default: ${params.window_size}]
       --step_size      DMR step size [default: ${params.step_size}]
       --min_cpgs       DMR min CpGs per window [default: ${params.min_cpgs}]
+      --alignment_only Stop after methylation extraction (skip cohort steps) [default: false]
     """.stripIndent()
     exit 0
 }
@@ -163,36 +164,40 @@ workflow {
             .collect()
     }
 
-    // ---- Step 7: ComBat-meth batch correction ----
-    COMBAT_METH(
-        bedgraphs_ch,
-        sample_sheet_ch.first()
-    )
+    // ---- Cohort-level analysis (requires multiple samples) ----
+    if (!params.alignment_only) {
 
-    // ---- Step 8: PCA plots ----
-    PCA_PLOT(
-        COMBAT_METH.out.mvalues_raw,
-        COMBAT_METH.out.mvalues_corrected,
-        sample_sheet_ch.first()
-    )
+        // ---- Step 7: ComBat-meth batch correction ----
+        COMBAT_METH(
+            bedgraphs_ch,
+            sample_sheet_ch.first()
+        )
 
-    // ---- Step 9: Houseman deconvolution ----
-    HOUSEMAN_DECONV(
-        COMBAT_METH.out.beta_matrix,
-        sample_sheet_ch.first()
-    )
+        // ---- Step 8: PCA plots ----
+        PCA_PLOT(
+            COMBAT_METH.out.mvalues_raw,
+            COMBAT_METH.out.mvalues_corrected,
+            sample_sheet_ch.first()
+        )
 
-    // ---- Step 10: Region detection (DMRs) ----
-    REGION_DETECT(
-        COMBAT_METH.out.mvalues_corrected,
-        sample_sheet_ch.first()
-    )
+        // ---- Step 9: Houseman deconvolution ----
+        HOUSEMAN_DECONV(
+            COMBAT_METH.out.beta_matrix,
+            sample_sheet_ch.first()
+        )
 
-    // ---- Step 11: NMF patient stratification ----
-    NMF_STRATIFY(
-        COMBAT_METH.out.mvalues_corrected,
-        sample_sheet_ch.first()
-    )
+        // ---- Step 10: Region detection (DMRs) ----
+        REGION_DETECT(
+            COMBAT_METH.out.mvalues_corrected,
+            sample_sheet_ch.first()
+        )
+
+        // ---- Step 11: NMF patient stratification ----
+        NMF_STRATIFY(
+            COMBAT_METH.out.mvalues_corrected,
+            sample_sheet_ch.first()
+        )
+    }
 }
 
 // --- Completion message ---

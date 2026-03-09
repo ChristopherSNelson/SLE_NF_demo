@@ -88,6 +88,15 @@ python3 bin/generate_test_data.py --outdir test_data
 nextflow run main.nf -profile test,conda
 ```
 
+### Single-sample alignment test (skip cohort steps)
+```bash
+nextflow run main.nf -profile local,conda \
+  --sample_sheet samples_single.csv \
+  --genome GRCh38.primary_assembly.genome.fa \
+  --alignment_only true \
+  --outdir results_single
+```
+
 ### HPC (SLURM)
 ```bash
 nextflow run main.nf -profile slurm,conda --sample_sheet samples.csv --genome hg38.fa
@@ -316,6 +325,9 @@ These were all encountered and fixed during initial testing. They are baked into
 12. **ComBatMet needs ≥3 samples per batch** — with only 2 per batch, beta regression can't estimate within-batch variance (subscript out of bounds)
 13. **gcc version mismatch in conda** — R built with gcc 13.3.0 but conda installs 13.4.0; `combat_meth.R` auto-creates a symlink to fix this
 14. **cxx-compiler + gfortran + llvm-openmp required** in `r_methylation.yml` — without these, `updog` (ComBatMet dep) fails to compile from source
+15. **`Math.min()` doesn't work on Nextflow MemoryUnit** — use `[4.GB * task.attempt, 16.GB].min()` (Groovy collection min) instead of `Math.min(4.GB * task.attempt, 16.GB)`
+16. **Picard MarkDuplicates needs JVM memory cap** — without `-Xmx`, Picard grabs all available heap and OOMs on 16 GB machines. Use `picard -Xmx${avail_mem}g` + `MAX_RECORDS_IN_RAM=500000`
+17. **BH correction: don't depend on statsmodels** — implement Benjamini-Hochberg directly with numpy to avoid adding another conda dependency
 
 ## Nextflow DSL2 Gotchas
 
