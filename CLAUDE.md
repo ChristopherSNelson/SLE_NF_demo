@@ -411,7 +411,7 @@ Common pitfalls when writing or modifying this pipeline. These apply to Nextflow
 
 ## Coding Conventions
 
-- No mid-sentence bold for emphasis anywhere (README, code comments, responses). Bold is fine for standalone labels, table entries, and section headers in CLAUDE.md or explanatory responses.
+- No mid-sentence bold in written artifacts (README.md, code comments, CLAUDE.md prose). Mid-sentence bold is fine in chat responses that don't write to a file.
 - Nextflow DSL2 syntax throughout
 - Process names in UPPER_SNAKE_CASE
 - All scripts in `bin/` with proper shebangs (`#!/usr/bin/env Rscript`, `#!/usr/bin/env python3`)
