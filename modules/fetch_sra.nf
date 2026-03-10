@@ -11,16 +11,11 @@ process FETCH_SRA {
 
     script:
     """
-    # prefetch first to avoid fasterq-dump APFS disk-limit bug (fs_type=unexpected)
+    # prefetch first to download .sra locally
     prefetch ${srr_accession} --max-size 100G -o ${srr_accession}.sra
 
-    fasterq-dump \\
-        --split-files \\
-        --threads ${task.cpus} \\
-        --temp . \\
-        ${srr_accession}.sra
-
+    # fastq-dump streams to gzip with no temp space (fasterq-dump needs ~3x SRA size)
+    fastq-dump --split-files --gzip ${srr_accession}.sra
     rm -f ${srr_accession}.sra
-    gzip ${srr_accession}_1.fastq ${srr_accession}_2.fastq
     """
 }

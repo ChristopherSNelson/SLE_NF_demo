@@ -358,7 +358,7 @@ These were all encountered and fixed during initial testing. They are baked into
 17. **BH correction: don't depend on statsmodels** — implement Benjamini-Hochberg directly with numpy to avoid adding another conda dependency
 18. **dmrseq GRanges → data.frame**: `as.data.frame(dmrs)` returns S4 DFrame, not base data.frame. Extract fields with `GenomicRanges::mcols()` and build data.frame manually
 19. **dmrseq column names**: dmrseq uses `pval`/`qval`, not `pvalue`/`qvalue`. Check both naming conventions
-20. **fasterq-dump APFS disk limit**: sra-tools 3.2.1 doesn't recognize APFS (`fs_type=unexpected`), defaults to tiny disk limit. `--disk-limit-tmp` doesn't help. Fix: use `prefetch` first to download .sra file, then `fasterq-dump` on the local file
+20. **fasterq-dump disk space**: sra-tools 3.2.1 requires ~3x the .sra file size in temp space for fasterq-dump (APFS `fs_type=unexpected` or `rcTooBig` on large files). Fix: use `prefetch` to download .sra, then **`fastq-dump --split-files --gzip`** for streaming extraction (no temp space, but single-threaded/slower). Delete the .sra after extraction.
 21. **Use `storeDir` for expensive deterministic tasks**: `publishDir` copies outputs; `work/` is tied to task hash (any script/config change invalidates cache). `storeDir` is a persistent cache — if output files exist, the task is skipped entirely. Use for: genome indexing (`genome_index/`), SRA downloads (`fastq_cache/`). Immune to script changes, work dir cleanups, and hash mismatches
 
 ## Nextflow DSL2 Gotchas
@@ -413,6 +413,7 @@ Common pitfalls when writing or modifying this pipeline. These apply to Nextflow
 - Python scripts use argparse for CLI argument parsing
 - PublishDir pattern: `"${params.outdir}/<stage_name>"`
 - Resource labels: `label 'process_low'`, `label 'process_medium'`, `label 'process_high'`
+- **Bash commands in script blocks: one-liners preferred.** If a command must span lines, use `\\` with no extra blank lines or padding — keep it tight. Avoid spread-out multiline style for short commands.
 
 ## Build Progress & Next Steps
 
