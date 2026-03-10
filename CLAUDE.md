@@ -411,6 +411,7 @@ Common pitfalls when writing or modifying this pipeline. These apply to Nextflow
 
 ## Coding Conventions
 
+- No inline bold in responses unless explicitly requested
 - Nextflow DSL2 syntax throughout
 - Process names in UPPER_SNAKE_CASE
 - All scripts in `bin/` with proper shebangs (`#!/usr/bin/env Rscript`, `#!/usr/bin/env python3`)
