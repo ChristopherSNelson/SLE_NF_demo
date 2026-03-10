@@ -178,6 +178,29 @@ tryCatch({
 
     cat("DMR columns:", paste(colnames(dmr_df), collapse = ", "), "\n")
 
+    # --- VDJ risk annotation ---
+    # Human immune receptor loci (hg38) where somatic recombination creates
+    # methylation artifacts that mimic DMRs in blood/PBMC samples.
+    vdj_loci <- data.frame(
+      chr   = c("chr14", "chr2",  "chr22", "chr14",    "chr7",  "chr7"),
+      start = c(105586437, 88857361, 22026076, 21621904, 38240024, 142299011),
+      end   = c(106879844, 90235368, 22922913, 22552132, 38368055, 142813287),
+      locus = c("IGH",   "IGK",   "IGL",   "TRA_TRD",  "TRB",   "TRG"),
+      stringsAsFactors = FALSE
+    )
+
+    dmr_df$vdj_risk <- FALSE
+    dmr_df$vdj_locus <- NA_character_
+    for (i in seq_len(nrow(vdj_loci))) {
+      overlap <- dmr_df$seqnames == vdj_loci$chr[i] &
+                 dmr_df$end >= vdj_loci$start[i] &
+                 dmr_df$start <= vdj_loci$end[i]
+      dmr_df$vdj_risk[overlap] <- TRUE
+      dmr_df$vdj_locus[overlap] <- vdj_loci$locus[i]
+    }
+    n_vdj <- sum(dmr_df$vdj_risk)
+    if (n_vdj > 0) cat("Flagged", n_vdj, "DMRs overlapping VDJ loci\n")
+
     # Full results
     write.table(dmr_df, file.path(opt$outdir, "window_results.tsv"),
                 sep = "\t", row.names = FALSE, quote = FALSE)

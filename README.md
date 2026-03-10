@@ -111,7 +111,19 @@ This dataset exercises all pipeline code paths but is underpowered for biologica
 - **M-values** (logit of beta) for all statistical and ML analyses
 - **Houseman via quadprog** — avoids Bioconductor/minfi compilation issues
 - **NMF rank selection** uses cophenetic correlation + dispersion + silhouette together
+- **VDJ risk annotation** on DMRs — immune receptor loci (IGH, IGK, IGL, TRA/TRD, TRB, TRG) undergo somatic recombination that mimics differential methylation. DMRs overlapping these regions are flagged with `vdj_risk=TRUE`
 - **Per-module conda environments** managed automatically by Nextflow
+
+## Companion: ImmuneMethylTools
+
+[ImmuneMethylTools](https://github.com/ChristopherSNelson/ImmuneMethylTools) is a complementary pre-alignment QC framework for immune-cell methylation studies. It provides upstream quality gates that run before this pipeline's alignment stage:
+
+- **Bisulfite conversion QC** — flags samples with non-CpG methylation rate >1% (incomplete conversion)
+- **Sample contamination detection** — identifies muddy beta distributions via Sarle's Bimodality Coefficient
+- **Batch × disease confound check** — Cramér's V test to detect batch-confounded designs before batch correction absorbs biological signal
+- **VDJ clonal artifact masking** — detects and masks CpGs in immune receptor loci where somatic recombination creates artifactual methylation signals, preserving samples for downstream analysis rather than dropping them
+
+Together, the two tools form a full QC → analysis workflow for autoimmune WGBS cohorts.
 
 ## License
 

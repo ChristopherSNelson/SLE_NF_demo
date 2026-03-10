@@ -22,3 +22,7 @@ results_*/
 # Persistent caches (storeDir)
 fastq_cache/
 genome_index/
+fastq_downsampled/
+# Misc
+*.log
+*Screenshot*.png

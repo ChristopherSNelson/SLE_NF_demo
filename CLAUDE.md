@@ -398,6 +398,11 @@ Common pitfalls when writing or modifying this pipeline. These apply to Nextflow
 - **Conda env creation is per-unique-YAML.** If two processes point to the same YAML, they share one env. Changing the YAML triggers a rebuild.
 - **`-profile conda` is required at runtime** to activate conda. Without it, processes try to run in the host environment.
 
+### Killing Nextflow
+- **Always use `kill -9 <pid>`** — Nextflow's JVM catches SIGTERM and attempts graceful shutdown (flush logs, clean work state), which frequently hangs indefinitely. SIGKILL bypasses this entirely.
+- Find the PID with `pgrep -a -f nextflow`
+- Child processes (bwameth, samtools, etc.) are usually cleaned up when the JVM dies, but verify with `pgrep -a -f "bwameth|fastp|bwa|picard|samtools"`
+
 ### Common runtime errors
 - **"Missing output file"** — the glob pattern in `output:` didn't match any files. Check the exact filename produced by the tool.
 - **"No such variable"** — usually a Nextflow vs bash variable collision. Escape bash `$` as `\$`.
