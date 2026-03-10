@@ -8,15 +8,15 @@ End-to-end Nextflow DSL2 pipeline for Systemic Lupus Erythematosus (SLE) bisulfi
 
 | Stage | Tool | Description |
 |-------|------|-------------|
-| QC | FastQC | Pre- and post-trim quality reports |
-| Trimming | Trim Galore | Adapter and quality trimming |
+| QC + trimming | fastp | Adapter trimming, quality filtering, QC reports |
 | Alignment | bwa-meth | Bisulfite-aware alignment to hg38 |
 | Deduplication | Picard | Mark and remove PCR duplicates |
+| CRAM conversion | samtools | BAM → CRAM (40–60% smaller) |
 | Methylation calling | MethylDackel | Per-CpG methylation extraction |
 | Batch correction | ComBat-meth | Methylation-specific batch correction on M-values |
 | PCA | R/ggplot2 | Raw and corrected PCA plots by batch and condition |
 | Cell deconvolution | Houseman (quadprog) | Blood cell type fraction estimation |
-| Region detection | Python/sklearn | Sub-population-aware DMR candidate identification |
+| DMR detection | dmrseq | Count-level DMR detection with permutation p-values |
 | Patient stratification | NMF | Unsupervised subtype discovery with rank selection |
 
 ## Prerequisites
@@ -95,7 +95,13 @@ results/
 
 ## Dataset
 
-Current validation cohort: [SRP410780](https://www.ncbi.nlm.nih.gov/sra/?term=SRP410780) — 11 WGBS samples (4 SLE, 3 Sjogren's, 4 healthy controls).
+Validation cohort: [SRP410780](https://www.ncbi.nlm.nih.gov/sra/?term=SRP410780) (GEO: [GSE213478](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE213478)) — 11 whole-genome bisulfite sequencing samples (4 SLE, 3 Sjogren's, 4 healthy controls).
+
+### Downsampled runs
+
+The current workflow uses pre-subsampled local FASTQs — the pipeline no longer auto-fetches from SRA (`FETCH_SRA` is disabled in `main.nf`). Reads are subsampled to ~50 M read pairs per sample (~2× CpG coverage, sufficient at `--min_depth 2`) using `fastq-dump -X 50000000 --split-files --gzip` (sra-tools; Leinonen et al., *Nucleic Acids Research* 2011) and stored in `fastq_downsampled/`. To re-enable SRA streaming, uncomment `FETCH_SRA` in `main.nf`.
+
+The 6-sample downsampled subset (`samples_downsampled.csv`) uses 3 SLE + 3 Control samples balanced across 2 batches (SRR22476697–698, SRR22476700–701, SRR22476704–705).
 
 This dataset exercises all pipeline code paths but is underpowered for biological discovery (n=11). The future goal is to expand to 50+ samples across diverse ethnicities, reflecting the disproportionate impact of SLE on Black, Hispanic, and Asian populations.
 

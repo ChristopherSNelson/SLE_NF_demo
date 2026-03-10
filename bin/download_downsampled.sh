@@ -7,7 +7,7 @@
 set -euo pipefail
 
 NUM_READS=50000000  # 50M reads (~2x WGS coverage, ~5.5% of full depth)
-OUTDIR="downsampled_fastq"
+OUTDIR="fastq_downsampled"
 CONDA_ENV="work/conda/env-83b9441f58bbf195-81269c29b376af0d44fd374274f6f1f3"
 
 # 6 samples: 3 SLE + 3 Control, balanced across 2 batches

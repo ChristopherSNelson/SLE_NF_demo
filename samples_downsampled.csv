@@ -1,7 +1,7 @@
 sample_id,fastq_1,fastq_2,condition,batch
-SRR22476697,downsampled_fastq/SRR22476697_1.fastq.gz,downsampled_fastq/SRR22476697_2.fastq.gz,SLE,batch1
-SRR22476698,downsampled_fastq/SRR22476698_1.fastq.gz,downsampled_fastq/SRR22476698_2.fastq.gz,SLE,batch1
-SRR22476700,downsampled_fastq/SRR22476700_1.fastq.gz,downsampled_fastq/SRR22476700_2.fastq.gz,SLE,batch2
-SRR22476701,downsampled_fastq/SRR22476701_1.fastq.gz,downsampled_fastq/SRR22476701_2.fastq.gz,Control,batch2
-SRR22476704,downsampled_fastq/SRR22476704_1.fastq.gz,downsampled_fastq/SRR22476704_2.fastq.gz,Control,batch1
-SRR22476705,downsampled_fastq/SRR22476705_1.fastq.gz,downsampled_fastq/SRR22476705_2.fastq.gz,Control,batch1
+SRR22476697,fastq_downsampled/SRR22476697_1.fastq.gz,fastq_downsampled/SRR22476697_2.fastq.gz,SLE,batch1
+SRR22476698,fastq_downsampled/SRR22476698_1.fastq.gz,fastq_downsampled/SRR22476698_2.fastq.gz,SLE,batch1
+SRR22476700,fastq_downsampled/SRR22476700_1.fastq.gz,fastq_downsampled/SRR22476700_2.fastq.gz,SLE,batch2
+SRR22476701,fastq_downsampled/SRR22476701_1.fastq.gz,fastq_downsampled/SRR22476701_2.fastq.gz,Control,batch2
+SRR22476704,fastq_downsampled/SRR22476704_1.fastq.gz,fastq_downsampled/SRR22476704_2.fastq.gz,Control,batch1
+SRR22476705,fastq_downsampled/SRR22476705_1.fastq.gz,fastq_downsampled/SRR22476705_2.fastq.gz,Control,batch1

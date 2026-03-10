@@ -162,7 +162,7 @@ All enabled in `nextflow.config` — no flags needed at runtime:
 
 | # | Process | Tool | Inputs | Key Outputs |
 |---|---------|------|--------|-------------|
-| 0 | FETCH_SRA | fasterq-dump | SRR accession | Paired-end FASTQ.gz in `fastq_cache/` (persistent storeDir) |
+| 0 | FETCH_SRA | fasterq-dump | SRR accession | Paired-end FASTQ.gz in `fastq_cache/` (persistent storeDir) — **currently disabled in main.nf; pipeline uses pre-subsampled local FASTQs in `fastq_downsampled/`** |
 | 1 | FASTP | fastp | Raw FASTQs | Trimmed FASTQs + HTML/JSON QC reports |
 | 2 | BWAMETH_INDEX | bwameth index | Genome FASTA | C2T converted index in `genome_index/` (persistent storeDir) |
 | 3 | BWAMETH_ALIGN | bwameth | Trimmed FASTQs + index | Sorted BAMs + BAI + flagstat (not published) |
@@ -190,7 +190,7 @@ sample_id,fastq_1,fastq_2,condition,batch
 SRR22476697,SRR22476697,,SLE,batch1
 ```
 
-Both modes can be mixed in the same sample sheet. SRA rows are auto-detected by the `SRR` prefix and routed through `FETCH_SRA`; local rows go straight to QC.
+Both modes can be mixed in the same sample sheet. SRA rows are auto-detected by the `SRR` prefix and routed through `FETCH_SRA`; local rows go straight to QC. **Note:** FETCH_SRA is currently disabled in `main.nf` — the active workflow uses pre-subsampled FASTQs in `fastq_downsampled/` via `samples_downsampled.csv`. To re-enable, uncomment `FETCH_SRA` in `main.nf`.
 
 ### Data flow
 ```

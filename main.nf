@@ -118,14 +118,14 @@ workflow {
         sra_ch = sample_rows.sra
             .map { row -> tuple(row.sample_id, row.fastq_1) }
 
-        FETCH_SRA(sra_ch)
+        // FETCH_SRA disabled — use local FASTQs only (samples_downsampled.csv has no SRR rows)
+        // FETCH_SRA(sra_ch)
 
         // Local FASTQs
         local_reads_ch = sample_rows.local
             .map { row -> tuple(row.sample_id, [file(row.fastq_1), file(row.fastq_2)]) }
 
-        // Merge SRA-fetched reads with local reads
-        reads_ch = FETCH_SRA.out.reads.mix(local_reads_ch)
+        reads_ch = local_reads_ch
 
         // Reference genome
         genome_ch = Channel.fromPath(params.genome)
