@@ -9,7 +9,7 @@ End-of-session procedure. Run this before closing Claude Code.
    - What's left / next steps (in priority order)
    - Key decisions made and why
    - Current blockers
-   - Any active pipeline runs (check `pgrep -a -f nextflow` and note PIDs, sample sheet, outdir, expected duration)
+   - If `*.nf` files exist in the project, check for active pipeline runs (`pgrep -a -f nextflow`) and note any PIDs, sample sheet, outdir, expected duration
 
 2. Propose any additions to the Mistakes Log in `CLAUDE.md` from lessons learned this session.
 
