@@ -411,7 +411,7 @@ Common pitfalls when writing or modifying this pipeline. These apply to Nextflow
 
 ## Coding Conventions
 
-- No inline bold in README.md or code comments. Bold is fine in CLAUDE.md and in informational/explanatory responses to guide understanding.
+- No mid-sentence bold for emphasis anywhere (README, code comments, responses). Bold is fine for standalone labels, table entries, and section headers in CLAUDE.md or explanatory responses.
 - Nextflow DSL2 syntax throughout
 - Process names in UPPER_SNAKE_CASE
 - All scripts in `bin/` with proper shebangs (`#!/usr/bin/env Rscript`, `#!/usr/bin/env python3`)
