@@ -4,6 +4,10 @@ End-to-end Nextflow DSL2 pipeline for Systemic Lupus Erythematosus (SLE) bisulfi
 
 **FASTQ → alignment → methylation calling → batch correction → cell deconvolution → DMR detection → patient stratification**
 
+## Pipeline DAG
+
+![Pipeline DAG](docs/dag.png)
+
 ## Pipeline Stages
 
 | Stage | Tool | Description |

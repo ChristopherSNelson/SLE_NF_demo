@@ -183,7 +183,7 @@ tryCatch({
     # methylation artifacts that mimic DMRs in blood/PBMC samples.
     vdj_loci <- data.frame(
       chr   = c("chr14", "chr2",  "chr22", "chr14",    "chr7",  "chr7"),
-      start = c(105586437, 88857361, 22026076, 21621904, 38240024, 142299011),
+      start = c(105586937, 88857361, 22026076, 21621904, 38240024, 142299011),
       end   = c(106879844, 90235368, 22922913, 22552132, 38368055, 142813287),
       locus = c("IGH",   "IGK",   "IGL",   "TRA_TRD",  "TRB",   "TRG"),
       stringsAsFactors = FALSE
