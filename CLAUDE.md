@@ -510,8 +510,54 @@ Test command: `nextflow run main.nf -profile test,conda`
 
 ## Claude Model
 
-Use **Claude Sonnet 4.6** for this project (cost savings over Opus).
-Switch with `/model` in Claude Code, or start sessions with `claude --model claude-sonnet-4-6`.
+### Model selection
+- **Opus for thinking**: plan mode, architecture decisions, debugging subtle biology/stats, reviewing scientific soundness, writing CLAUDE.md rules.
+- **Sonnet for doing**: executing a locked plan, scaffolding, writing tests, refactoring, git operations. Switch with `/model sonnet` mid-session.
+- **Rule of thumb**: Plan mode → Opus. Auto-accept execution with a solid plan → Sonnet stretches the budget 3–5x.
+
+Default to **Sonnet 4.6** unless you're doing architecture or scientific review.
+
+## Guardrail Alerts
+
+Proactively warn when any of the following are detected — do not wait to be asked:
+
+| Signal | What to say |
+|--------|-------------|
+| **Context bloat** | "This session is getting long (~N turns). Want me to write a HANDOFF.md and start fresh?" |
+| **Token-heavy output** | Before a command producing >100 lines of stdout: "This will dump a lot of output. Want me to truncate or summarise instead?" |
+| **Scope creep** | If a single prompt asks for 3+ loosely related things: "This is turning into multiple tasks. Want to do them one at a time so I can verify each?" |
+| **Complexity escalation** | File >300 lines, function >50 lines, or plan >8 steps: "This is getting complex. Want to break it into smaller pieces?" |
+| **Stability risk** | Before touching a critical path: "This touches [X]. I'll run the test profile before and after — flagging the risk." |
+| **Resource pressure** | Before recommending anything that stresses 16 GB RAM (large model load, full-genome op): "This may push memory. Here's a lighter alternative: [X]." |
+| **Diminishing returns** | Debug loop >3 iterations without progress: "We've been circling on this. Want to re-plan from scratch or write a HANDOFF.md and come back fresh?" |
+
+## Verification Loop
+
+Before declaring any code change complete, run:
+
+```bash
+nextflow run main.nf -profile test,conda
+```
+
+This runs the full downstream pipeline on simulated chr22 data (~13s with cache). Do not report success unless it passes. If the change only touches alignment modules (not downstream R/Python), a dry-run check is sufficient: `nextflow run main.nf -preview`.
+
+## Handoff Discipline
+
+After 15+ turns, or at the end of any distinct unit of work, proactively offer to write a `HANDOFF.md` summarising:
+- What was done
+- What's left
+- Key decisions made
+- Current blockers
+
+This lets the next session start clean without re-paying for old context. After writing the handoff, propose any `CLAUDE.md` updates from lessons learned in the session.
+
+## Mistakes Log
+
+Append-only log of corrections — propose an entry after any mistake. Format: `date | what went wrong | rule added`.
+
+<!-- entries below -->
+- 2026-03-10 | Used `Math.min()` on Nextflow MemoryUnit — silently fails | Use `[a, b].min()` (Groovy collection) for memory caps
+- 2026-03-10 | IGH hg38 start coordinate off by 500 bp | Always verify VDJ locus coords against IMGT before hardcoding
 
 ## Git Commit Conventions
 
