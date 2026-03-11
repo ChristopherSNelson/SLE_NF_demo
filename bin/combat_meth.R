@@ -125,15 +125,18 @@ if (length(unique(batch_info)) > 1) {
   cat("  Batches:", paste(unique(batch_info), collapse = ", "), "\n")
   cat("  Groups:", paste(unique(condition_info), collapse = ", "), "\n")
 
-  beta_corrected <- ComBat_met(
-    beta_mat,
-    batch = batch_info,
-    group = group_numeric,
-    full_mod = TRUE
-  )
-
-  # Enforce bounds after correction
-  beta_corrected <- pmin(pmax(beta_corrected, 0.001), 0.999)
+  beta_corrected <- tryCatch({
+    result <- ComBat_met(
+      beta_mat,
+      batch = batch_info,
+      group = group_numeric,
+      full_mod = TRUE
+    )
+    pmin(pmax(result, 0.001), 0.999)
+  }, error = function(e) {
+    cat("WARNING: ComBatMet failed (", conditionMessage(e), ") — falling back to uncorrected beta values\n")
+    beta_mat
+  })
 } else {
   cat("Only one batch detected — skipping ComBatMet correction\n")
   beta_corrected <- beta_mat
