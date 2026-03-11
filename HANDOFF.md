@@ -1,44 +1,51 @@
-# HANDOFF — 2026-03-10
+# HANDOFF — 2026-03-10 Evening Session
 
-## Active pipeline run
+## Active Pipeline Run
+- tmux session: `pipeline` — attach with `tmux attach -t pipeline`
+- seqtk subsampling still in progress (12 parallel jobs, ~20 processes) as of session close
+- Nextflow auto-starts after `wait` completes — no action needed
+- Nextflow command running:
+  ```
+  nextflow run main.nf -profile local,conda \
+    --sample_sheet samples_chr19.csv \
+    --genome chr19.fa \
+    --min_depth 1 \
+    --outdir results_chr19 \
+    -resume 2>&1 | tee chr19_run.log
+  ```
+- Monitor: `tail -f chr19_run.log`
+- Expected completion: midnight–2am (bottleneck is BWAMETH_ALIGN, 6 samples sequential at 6 CPUs)
+- Laptop must stay open — lid close forces sleep even with `caffeinate -i`
 
-Single-sample alignment is running in a separate terminal:
-- PIDs: 16286 (JVM), 16287 (caffeinate wrapper)
-- Command: `nextflow run main.nf -profile local,conda --sample_sheet samples_single_downsampled.csv --genome GRCh38.primary_assembly.genome.fa --alignment_only true --min_depth 2 --outdir results_single_downsampled -resume`
-- Expected duration: 6-10h (genome index cached, 6 CPUs)
-- Monitor: `tail -f nf_run.log` or check `.nextflow.log`
-- Kill if needed: `kill -9 16286 16287`
+## What Was Done This Session
+- Killed stalled full-genome single-sample alignment (PIDs 16286/16287 and children)
+- Pivoted strategy: chr19-only run to get real figures before Thursday 3pm interview
+- Installed `seqtk` 1.5 and `tmux` via brew
+- Extracted `chr19.fa` (57 MB) from GRCh38, indexed as `chr19.fa.fai`
+- Created `samples_chr19.csv` pointing to `fastq_chr19/` subsampled FASTQs
+- Launched parallel seqtk subsampling (10M reads/file, 12 files, bash `&` + `wait` in tmux)
+- Queued Nextflow step 3 in same tmux session — auto-starts after subsampling
 
-## What was done this session
+## What's Left (priority order)
+1. Wait for chr19 pipeline to finish — verify `results_chr19/` outputs
+2. Harvest figures: PCA, NMF UMAP, DMR manhattan, cell fractions, fastp QC, M-bias
+3. SLIDES — interview Thursday Mar 12 3pm, not started yet
+4. (Optional) delete `fastq_downsampled/` (32 GB) after figures confirmed good
 
-- Fixed `process_high` cpus: 6 min / 8 max (was always 8; machine has 8 physical cores)
-- Added VDJ risk annotation to `bin/region_detect.R` — flags DMRs overlapping IGH/IGK/IGL/TRA_TRD/TRB/TRG with `vdj_risk` + `vdj_locus` columns
-- Fixed IGH hg38 start coordinate: 105586437 → 105586937 (verified against IMGT)
-- Dry-run validated VDJ annotation logic with synthetic DMRs (6/6 loci flagged, clean control correct)
-- Updated README: added pipeline DAG image, ImmuneMethylTools companion section, removed inline bold
-- Generated `docs/dag.png` via `nextflow run main.nf -preview -with-dag`
-- Added to CLAUDE.md: guardrail alerts table, verification loop, handoff discipline, mistakes log, model selection nuance, kill -9 tip, no-bold rule
-- Ported relevant sections from bcherny-claude CLAUDE.md
-- Created `/shutdown` slash command at `.claude/commands/shutdown.md` and `~/.claude/commands/shutdown.md`
-- Pushed private GitHub repo: https://github.com/ChristopherSNelson/SLE_NF_demo
-- All changes committed and pushed to main
+## Key Decisions
+- Chr19 over chr22: biologically richer (KIR cluster, gene-dense, relevant for autoimmunity)
+- 10M reads per sample: ~300K map to chr19 (~0.8x), `--min_depth 1` to compensate
+- Parallel subsampling via bash `&` + `wait` in tmux: all 12 files simultaneously
+- `caffeinate -i` wraps full pipeline to prevent idle sleep on battery
 
-## What's left (priority order)
+## Potential Blockers
+- Coverage on chr19 may be thin (0.8x) — if ComBatMet or dmrseq fails, re-run seqtk with 20M reads
+  - ComBatMet needs ≥3 samples per batch
+  - Original `fastq_downsampled/` (32 GB) preserved for re-subsampling if needed
+- Conda `base` has ancient samtools 0.1.19 shadowing brew's 1.23 — use `/opt/homebrew/bin/samtools` in shell
 
-1. Wait for single-sample alignment to finish — verify CRAM, bedGraph, M-bias plot, flagstat, trace.txt peak memory
-2. Run full 6-sample pipeline: `nextflow run main.nf -profile local,conda --sample_sheet samples_downsampled.csv --genome GRCh38.primary_assembly.genome.fa --min_depth 2 --outdir results_downsampled`
-3. Harvest figures for interview slides: PCA, NMF UMAP, DMR manhattan, cell fractions, fastp QC
-4. AWS Batch: blocked on billing (no payment method); region us-east-2
-5. Future polish: MultiQC, GitHub Actions CI, nf-core-style subway map diagram
-
-## Key decisions
-
-- FETCH_SRA stays disabled; pipeline uses `fastq_downsampled/` with `samples_downsampled.csv`
-- VDJ annotation is post-hoc (no new Nextflow process needed) — just a flag column in DMR output
-- ImmuneMethylTools positioned as complementary pre-alignment QC, not merged into this pipeline
-
-## Blockers
-
-- Single-sample run must complete before full 6-sample run (confirm alignment works end-to-end first)
-- AWS Batch needs payment method added to account
-- Interview Thursday Mar 12 — need real data figures before then
+## New Files This Session
+- `chr19.fa` + `chr19.fa.fai` — chr19-only reference
+- `samples_chr19.csv` — 6-sample sheet pointing to `fastq_chr19/`
+- `fastq_chr19/` — subsampled FASTQs (in progress at session close)
+- `chr19_run.log` — Nextflow stdout/stderr (created when Nextflow starts)

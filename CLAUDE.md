@@ -508,6 +508,7 @@ Test command: `nextflow run main.nf -profile test,conda`
 #### 3. Polish
 - Add MultiQC summary step
 - CI/CD: GitHub Actions workflow for test profile
+- Replace auto-generated Graphviz DAG with nf-core-style subway map diagram
 
 ## Claude Model
 
