@@ -1,7 +1,7 @@
 process BWAMETH_INDEX {
     label 'process_high'
     conda "${projectDir}/envs/bwameth.yml"
-    storeDir "${projectDir}/genome_index"
+    storeDir "${params.genome_index_dir ?: "${projectDir}/genome_index"}"
 
     input:
     path genome

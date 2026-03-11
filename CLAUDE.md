@@ -565,6 +565,10 @@ Append-only log of corrections — propose an entry after any mistake. Format: `
 - 2026-03-11 | SRR22476704 R1 (955MB) vs R2 (3.6GB) mismatch caused fastp exit 255 | Always verify R1/R2 file sizes are comparable before pipeline run; fix by truncating longer file to match shorter
 - 2026-03-11 | ComBatMet crashes with `subscript out of bounds` when nearly all CpGs have zero within-batch variance (chr19-only data too sparse) | Wrap ComBat_met() in tryCatch, fall back to raw beta with warning
 - 2026-03-11 | MethylDackel mbias outputs SVGs not txt — `_mbias.txt` always empty | Publish SVGs, convert to PNG with rsvg-convert (librsvg in conda env)
+- 2026-03-11 | Full-genome `bwa-meth` (12GB) on 16GB machine caused severe swapping/thrashing | Reserve at least 4GB RAM and 2 CPU cores for macOS; cap 'process_high' to 10GB/4CPUs.
+- 2026-03-11 | process_high declared 6GB but bwameth uses 12GB — Nextflow scheduled 2 concurrent, thrashing 16GB machine | Declared memory must match real usage (12GB) so scheduler limits concurrency to 1
+- 2026-03-11 | Nextflow timeline/report/trace/dag crash on resume with "file already exists" | Add `overwrite = true` to all 4 trace blocks in nextflow.config
+- 2026-03-11 | AWS Spot Fleet role trust policy used `ec2.amazonaws.com` instead of `spotfleet.amazonaws.com` | Spot Fleet requires `spotfleet.amazonaws.com` as the trusted service principal
 
 ## Git Commit Conventions
 

@@ -1,0 +1,3 @@
+sample_id,fastq_1,fastq_2,condition,batch
+SRR22476697,s3://sle-methylation-pipeline/input/fastq/SRR22476697_1.fastq.gz,s3://sle-methylation-pipeline/input/fastq/SRR22476697_2.fastq.gz,SLE,batch1
+SRR22476701,s3://sle-methylation-pipeline/input/fastq/SRR22476701_1.fastq.gz,s3://sle-methylation-pipeline/input/fastq/SRR22476701_2.fastq.gz,Control,batch1
