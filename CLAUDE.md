@@ -562,6 +562,9 @@ Append-only log of corrections — propose an entry after any mistake. Format: `
 - 2026-03-10 | IGH hg38 start coordinate off by 500 bp | Always verify VDJ locus coords against IMGT before hardcoding
 - 2026-03-10 | Used `zcat file.fastq.gz` on macOS — silently produces empty output (macOS zcat expects `.Z` not `.gz`) | Always use `gzip -dc` on macOS for decompressing `.gz` files
 - 2026-03-10 | `find -size -1M` on macOS BSD find deleted files >1M (unexpected behavior vs GNU find) | Use explicit size comparisons or `awk` on `ls -l` output when filtering by file size on macOS
+- 2026-03-11 | SRR22476704 R1 (955MB) vs R2 (3.6GB) mismatch caused fastp exit 255 | Always verify R1/R2 file sizes are comparable before pipeline run; fix by truncating longer file to match shorter
+- 2026-03-11 | ComBatMet crashes with `subscript out of bounds` when nearly all CpGs have zero within-batch variance (chr19-only data too sparse) | Wrap ComBat_met() in tryCatch, fall back to raw beta with warning
+- 2026-03-11 | MethylDackel mbias outputs SVGs not txt — `_mbias.txt` always empty | Publish SVGs, convert to PNG with rsvg-convert (librsvg in conda env)
 
 ## Git Commit Conventions
 
