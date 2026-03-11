@@ -1,10 +1,10 @@
-# HANDOFF — 2026-03-10 Evening Session
+# HANDOFF — 2026-03-10 Late Evening Session
 
 ## Active Pipeline Run
 - tmux session: `pipeline` — attach with `tmux attach -t pipeline`
-- seqtk subsampling still in progress (12 parallel jobs, ~20 processes) as of session close
-- Nextflow auto-starts after `wait` completes — no action needed
-- Nextflow command running:
+- Subsampling in progress: 4/12 files done as of session close, 8 remaining
+- Nextflow will auto-start after subsampling completes
+- Nextflow command:
   ```
   nextflow run main.nf -profile local,conda \
     --sample_sheet samples_chr19.csv \
@@ -13,18 +13,19 @@
     --outdir results_chr19 \
     -resume 2>&1 | tee chr19_run.log
   ```
-- Monitor: `tail -f chr19_run.log`
-- Expected completion: midnight–2am (bottleneck is BWAMETH_ALIGN, 6 samples sequential at 6 CPUs)
+- Monitor subsampling: `ls -lh fastq_chr19/`
+- Monitor Nextflow: `tail -f chr19_run.log`
+- Expected subsampling done: ~10:30pm
+- Expected Nextflow done: ~2–3am (bottleneck is BWAMETH_ALIGN x6 samples)
 - Laptop must stay open — lid close forces sleep even with `caffeinate -i`
 
 ## What Was Done This Session
-- Killed stalled full-genome single-sample alignment (PIDs 16286/16287 and children)
-- Pivoted strategy: chr19-only run to get real figures before Thursday 3pm interview
-- Installed `seqtk` 1.5 and `tmux` via brew
-- Extracted `chr19.fa` (57 MB) from GRCh38, indexed as `chr19.fa.fai`
-- Created `samples_chr19.csv` pointing to `fastq_chr19/` subsampled FASTQs
-- Launched parallel seqtk subsampling (10M reads/file, 12 files, bash `&` + `wait` in tmux)
-- Queued Nextflow step 3 in same tmux session — auto-starts after subsampling
+- Killed stalled all-parallel seqtk jobs (I/O contention, 15+ hrs estimated)
+- Switched subsampling to `gzip -dc | head -n 40000000 | gzip`, 2 jobs at a time
+- Discovered macOS `zcat` silently produces empty output on `.gz` files — first run produced empty FASTQs, pipeline "completed" in minutes with zero aligned reads
+- Fixed script to use `gzip -dc`; wiped bad results (`rm -rf results_chr19/`, `nextflow clean -f`)
+- Re-ran subsampling — confirmed files now have real content (~300–940 MB each)
+- Updated `bin/run_chr19.sh` — idempotent, skips non-empty files
 
 ## What's Left (priority order)
 1. Wait for chr19 pipeline to finish — verify `results_chr19/` outputs
@@ -33,19 +34,16 @@
 4. (Optional) delete `fastq_downsampled/` (32 GB) after figures confirmed good
 
 ## Key Decisions
-- Chr19 over chr22: biologically richer (KIR cluster, gene-dense, relevant for autoimmunity)
-- 10M reads per sample: ~300K map to chr19 (~0.8x), `--min_depth 1` to compensate
-- Parallel subsampling via bash `&` + `wait` in tmux: all 12 files simultaneously
-- `caffeinate -i` wraps full pipeline to prevent idle sleep on battery
+- chr19 over chr22: biologically richer (KIR cluster, gene-dense, relevant for autoimmunity)
+- 10M reads per sample: ~200–300K map to chr19, `--min_depth 1` to compensate
+- `gzip -dc | head -n 40000000`, 2 at a time: avoids both reservoir-sampling overhead and I/O contention
+- `(gzip -dc "$f" | head -n 40000000; true) | gzip` — the `; true` suppresses broken-pipe SIGPIPE from head exiting early
 
 ## Potential Blockers
-- Coverage on chr19 may be thin (0.8x) — if ComBatMet or dmrseq fails, re-run seqtk with 20M reads
-  - ComBatMet needs ≥3 samples per batch
-  - Original `fastq_downsampled/` (32 GB) preserved for re-subsampling if needed
-- Conda `base` has ancient samtools 0.1.19 shadowing brew's 1.23 — use `/opt/homebrew/bin/samtools` in shell
+- Coverage on chr19 may be thin — if ComBatMet or dmrseq fails, re-run with 20M reads (`head -n 80000000`) and wipe cache
+- ComBatMet needs ≥3 samples per batch
+- Original `fastq_downsampled/` (32 GB) preserved for re-subsampling if needed
 
-## New Files This Session
-- `chr19.fa` + `chr19.fa.fai` — chr19-only reference
-- `samples_chr19.csv` — 6-sample sheet pointing to `fastq_chr19/`
-- `fastq_chr19/` — subsampled FASTQs (in progress at session close)
-- `chr19_run.log` — Nextflow stdout/stderr (created when Nextflow starts)
+## New/Modified Files This Session
+- `bin/run_chr19.sh` — fixed: `gzip -dc` instead of `zcat`, 2-at-a-time throttle, skip non-empty
+- `fastq_chr19/` — 4/12 files complete at session close

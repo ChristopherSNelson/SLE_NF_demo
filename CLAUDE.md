@@ -560,6 +560,8 @@ Append-only log of corrections — propose an entry after any mistake. Format: `
 <!-- entries below -->
 - 2026-03-10 | Used `Math.min()` on Nextflow MemoryUnit — silently fails | Use `[a, b].min()` (Groovy collection) for memory caps
 - 2026-03-10 | IGH hg38 start coordinate off by 500 bp | Always verify VDJ locus coords against IMGT before hardcoding
+- 2026-03-10 | Used `zcat file.fastq.gz` on macOS — silently produces empty output (macOS zcat expects `.Z` not `.gz`) | Always use `gzip -dc` on macOS for decompressing `.gz` files
+- 2026-03-10 | `find -size -1M` on macOS BSD find deleted files >1M (unexpected behavior vs GNU find) | Use explicit size comparisons or `awk` on `ls -l` output when filtering by file size on macOS
 
 ## Git Commit Conventions
 

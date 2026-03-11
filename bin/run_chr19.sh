@@ -16,19 +16,22 @@ else
     echo ">>> chr19.fa already exists, skipping"
 fi
 
-# Step 2: Subsample 10M reads per file in parallel (skip if already done)
-if [ ! -d fastq_chr19 ] || [ "$(ls fastq_chr19/*.fastq.gz 2>/dev/null | wc -l)" -lt 12 ]; then
-    echo ">>> Subsampling 10M reads per file..."
-    mkdir -p fastq_chr19
-    for f in fastq_downsampled/*.fastq.gz; do
-        seqtk sample -s42 "$f" 10000000 | gzip > "fastq_chr19/$(basename "$f")" &
-    done
-    wait
-    echo ">>> Subsampling done"
-    ls -lh fastq_chr19/
-else
-    echo ">>> fastq_chr19/ already populated, skipping"
-fi
+# Step 2: Subsample first 10M reads per file, 2 jobs at a time (skip non-empty files)
+echo ">>> Subsampling first 10M reads per file (2 at a time)..."
+mkdir -p fastq_chr19
+for f in fastq_downsampled/*.fastq.gz; do
+    out="fastq_chr19/$(basename "$f")"
+    if [ -s "$out" ]; then
+        echo "    skipping $out (already done)"
+        continue
+    fi
+    echo "    starting $(basename "$f")"
+    (gzip -dc "$f" | head -n 40000000; true) | gzip > "$out" &
+    while [ "$(jobs -r | wc -l)" -ge 2 ]; do sleep 1; done
+done
+wait
+echo ">>> Subsampling done"
+ls -lh fastq_chr19/
 
 # Step 3: Run Nextflow pipeline
 echo ">>> Starting Nextflow..."
