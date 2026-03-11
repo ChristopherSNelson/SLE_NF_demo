@@ -15,7 +15,7 @@ process BWAMETH_ALIGN {
 
     script:
     """
-    bwameth.py \\
+    BWA_METH_SKIP_TIME_CHECKS=1 bwameth.py \\
         --threads ${task.cpus} \\
         --reference ${genome} \\
         ${reads[0]} ${reads[1]} \\

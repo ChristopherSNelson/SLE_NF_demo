@@ -398,10 +398,62 @@ Common pitfalls when writing or modifying this pipeline. These apply to Nextflow
 - **Conda env creation is per-unique-YAML.** If two processes point to the same YAML, they share one env. Changing the YAML triggers a rebuild.
 - **`-profile conda` is required at runtime** to activate conda. Without it, processes try to run in the host environment.
 
-### Killing Nextflow
-- **Always use `kill -9 <pid>`** — Nextflow's JVM catches SIGTERM and attempts graceful shutdown (flush logs, clean work state), which frequently hangs indefinitely. SIGKILL bypasses this entirely.
-- Find the PID with `pgrep -a -f nextflow`
-- Child processes (bwameth, samtools, etc.) are usually cleaned up when the JVM dies, but verify with `pgrep -a -f "bwameth|fastp|bwa|picard|samtools"`
+### Killing Nextflow & AWS Batch — Kill Scripts
+
+#### 1. Kill local Nextflow + child processes
+```bash
+# Kill Nextflow JVM (SIGTERM hangs — always use -9)
+kill -9 $(pgrep -f nextflow) 2>/dev/null && echo "Nextflow killed" || echo "No Nextflow running"
+
+# Verify child processes are gone (usually die with JVM, but check)
+pgrep -a -f "bwameth|fastp|bwa|picard|samtools|MethylDackel" && \
+  pkill -9 -f "bwameth|fastp|bwa|picard|samtools|MethylDackel" || echo "No child processes"
+```
+
+#### 2. Cancel all non-terminal AWS Batch jobs on a queue
+```bash
+# Usage: bash <script> [queue-name]   default: sle-pipeline-queue
+QUEUE=${1:-sle-pipeline-queue}; REGION=us-east-2
+for STATUS in SUBMITTED PENDING RUNNABLE STARTING RUNNING; do
+  IDS=$(aws batch list-jobs --job-queue $QUEUE --job-status $STATUS --region $REGION \
+        --query 'jobSummaryList[].jobId' --output text 2>/dev/null)
+  for ID in $IDS; do
+    echo "Terminating $ID ($STATUS)"
+    aws batch terminate-job --job-id $ID --reason "Manual cancel" --region $REGION
+  done
+done
+echo "Done"
+```
+`terminate-job` works for all non-terminal states (cancel-job only works pre-STARTING).
+
+#### 3. Nuclear option — kill local NF + cancel all Batch jobs in one shot
+```bash
+kill -9 $(pgrep -f nextflow) 2>/dev/null; \
+REGION=us-east-2; \
+for Q in sle-pipeline-queue sle-test-queue; do \
+  for S in SUBMITTED PENDING RUNNABLE STARTING RUNNING; do \
+    for ID in $(aws batch list-jobs --job-queue $Q --job-status $S --region $REGION \
+                --query 'jobSummaryList[].jobId' --output text 2>/dev/null); do \
+      aws batch terminate-job --job-id $ID --reason "Nuclear cancel" --region $REGION && echo "Killed $ID"; \
+    done; \
+  done; \
+done
+```
+
+#### 4. Check what's still running (before/after)
+```bash
+# Local
+pgrep -a -f nextflow; pgrep -a -f "bwameth|fastp|samtools"
+
+# AWS Batch — count by status across both queues
+for Q in sle-pipeline-queue sle-test-queue; do \
+  for S in SUBMITTED PENDING RUNNABLE STARTING RUNNING; do \
+    N=$(aws batch list-jobs --job-queue $Q --job-status $S --region us-east-2 \
+        --query 'length(jobSummaryList)' --output text 2>/dev/null); \
+    [ "$N" -gt 0 ] 2>/dev/null && echo "$Q $S: $N"; \
+  done; \
+done
+```
 
 ### Common runtime errors
 - **"Missing output file"** — the glob pattern in `output:` didn't match any files. Check the exact filename produced by the tool.
@@ -568,6 +620,8 @@ Append-only log of corrections — propose an entry after any mistake. Format: `
 - 2026-03-11 | Full-genome `bwa-meth` (12GB) on 16GB machine caused severe swapping/thrashing | Reserve at least 4GB RAM and 2 CPU cores for macOS; cap 'process_high' to 10GB/4CPUs.
 - 2026-03-11 | process_high declared 6GB but bwameth uses 12GB — Nextflow scheduled 2 concurrent, thrashing 16GB machine | Declared memory must match real usage (12GB) so scheduler limits concurrency to 1
 - 2026-03-11 | Nextflow timeline/report/trace/dag crash on resume with "file already exists" | Add `overwrite = true` to all 4 trace blocks in nextflow.config
+- 2026-03-11 | bwameth rejects S3/Fusion-staged index files — mtime older than FASTA (S3 timestamps not preserved) | Set `BWA_METH_SKIP_TIME_CHECKS=1` env var in BWAMETH_ALIGN script block
+- 2026-03-11 | AWS Batch CE created with default allocationStrategy (BEST_FIT) — immutable, can't update in-place, jobs stuck RUNNABLE when Spot unavailable | Always create Spot CEs with `SPOT_CAPACITY_OPTIMIZED`; to fix existing CE must disable → recreate → update job queue
 - 2026-03-11 | AWS Spot Fleet role trust policy used `ec2.amazonaws.com` instead of `spotfleet.amazonaws.com` | Spot Fleet requires `spotfleet.amazonaws.com` as the trusted service principal
 
 ## Git Commit Conventions

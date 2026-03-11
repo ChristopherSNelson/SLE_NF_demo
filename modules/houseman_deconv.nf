@@ -6,6 +6,7 @@ process HOUSEMAN_DECONV {
     input:
     path beta_matrix
     path sample_sheet
+    path ref_panel
 
     output:
     path "cell_fractions.tsv",  emit: fractions
@@ -16,6 +17,7 @@ process HOUSEMAN_DECONV {
     houseman_deconv.R \\
         --beta_matrix ${beta_matrix} \\
         --sample_sheet ${sample_sheet} \\
+        --ref_panel ${ref_panel} \\
         --outdir .
     """
 }

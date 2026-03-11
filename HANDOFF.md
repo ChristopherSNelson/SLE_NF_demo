@@ -1,64 +1,43 @@
-# Handoff — 2026-03-11 ~noon
+# Session Handoff — 2026-03-11 evening
 
-## Active Run
-
-- **tmux:** `awsrun` — `tmux attach -t awsrun`
-- **Log:** `tail -f aws_run.log`
-- **Command:** `nextflow run main.nf -profile aws --sample_sheet samples_aws_test.csv --genome s3://sle-methylation-pipeline/input/GRCh38.primary_assembly.genome.fa --alignment_only true --outdir s3://sle-methylation-pipeline/results_aws_test`
-- **Status at handoff:** FASTP ✔ (2/2 cached), BWAMETH_INDEX building Wave container → will submit to AWS Batch
-- **Expected duration:** BWAMETH_INDEX ~2-3h, BWAMETH_ALIGN ~1-2h per sample (2 parallel)
-
-### Watch for
-- Fusion license warning ("Missing Seqera Platform access token") is expected — jobs still submit
-- If BWAMETH_INDEX fails: check `.nextflow.log` for S3 write errors on storeDir
-- If any Batch job fails: `aws s3 cp s3://sle-methylation-pipeline/work/<hash>/.command.err - --region us-east-2`
+## Active Pipeline Run
+- **PID:** 11315 (Nextflow JVM) — running in tmux
+- **Command:** `nextflow run main.nf -profile aws -resume --sample_sheet samples_aws_test.csv --genome s3://sle-methylation-pipeline/input/GRCh38.primary_assembly.genome.fa --outdir s3://sle-methylation-pipeline/results_aws_test`
+- **Samples:** SRR22476697 (SLE) + SRR22476701 (Control), full pipeline (no --alignment_only)
+- **Log:** `nf_sle_2sample_aws.log`
+- **Expected:** FASTP cached, BWAMETH_INDEX cached → straight to BWAMETH_ALIGN → MARK_DUPLICATES → BAM_TO_CRAM → METHYLDACKEL → COMBAT_METH → HOUSEMAN_DECONV → REGION_DETECT → NMF_STRATIFY
+- **Alignment ETA:** 2–4h per sample on r5.xlarge (4 vCPU, 24 GB)
 
 ## What Was Done This Session
 
-- AWS credentials fixed: expired session token replaced with root IAM access keys
-- AWS Batch hello world confirmed: on-demand and Spot instances both working
-- Fixed Spot Fleet IAM bug: `SLE-EC2FleetRole` needed `spotfleet.amazonaws.com` trust (was `ec2.amazonaws.com`)
-- Replaced custom ECR container approach with Wave + Fusion: auto-builds from conda YAMLs, no ECR needed
-- S3 data uploaded: genome + .fai + 4 FASTQs (2 samples) to `s3://sle-methylation-pipeline/input/`
-- Fixed BWAMETH_INDEX storeDir: now configurable via `params.genome_index_dir`; AWS profile sets it to S3
-- Fixed process_high memory: 6→12GB declared to match bwameth actual usage (prevents 2x concurrent thrash)
-- Fixed local executor: capped to 6 CPUs / 12GB (was 8/16, caused overnight thrashing)
-- Added `overwrite=true` to all trace/timeline/report/dag blocks (prevents resume crash)
-- FASTP confirmed running successfully on AWS Batch (~3 min, both samples)
-- Committed and relaunched pipeline in tmux `awsrun`
-
-## Next Steps (priority order)
-
-1. **BUILD SLIDES** — interview Thursday Mar 12 2:30pm (~24h away), not started
-   - Available real-data figures: chr19 results in `results_chr19/` (NMF UMAP, DMR manhattan, PCA, M-bias)
-   - Test profile figures: `results_test/` (labeled simulated, covers all downstream steps)
-   - Slide structure: motivation → DAG → QC → batch correction → cell deconv → DMR → NMF → future
-2. **Monitor AWS run** — if alignment finishes tonight, harvest bedGraphs and run downstream
-3. **Security**: delete root access keys from AWS console, create IAM user CLI keys
-4. **Downstream on AWS**: if bedGraphs land in S3, run full downstream with `--skip_alignment --bedgraph_dir s3://...`
+- **Diagnosed AWS run failure:** FASTP ✔, BWAMETH_INDEX ✔, BWAMETH_ALIGN ✗ (exit 1)
+  - Root cause: bwameth mtime check — S3/Fusion timestamps made index appear older than FASTA
+  - Fix: `BWA_METH_SKIP_TIME_CHECKS=1` prepended to bwameth command in `modules/bwameth_align.nf`
+- **Added Seqera/Tower token** to AWS profile via `System.getenv('TOWER_ACCESS_TOKEN')` — activates licensed Fusion
+- **Fixed AWS Batch resource misconfiguration:** process_high was 8 vCPU + 32 GB; CE had no allocation strategy (BEST_FIT), jobs stuck RUNNABLE
+  - Lowered process_high in AWS profile to 4 vCPU + 24 GB (fits r5.xlarge)
+- **Replaced synthetic Houseman reference panel** with Salas 2018 IDOL library (450 WGBS-optimized CpGs, 6 blood cell types)
+  - `salas_2018_cpgs.csv` moved to `assets/`
+  - `bin/houseman_deconv.R` rewritten to load real reference, join by chr:start
+  - `modules/houseman_deconv.nf` updated with `path ref_panel` input
+  - `main.nf` updated to pass `Channel.fromPath(params.ref_panel).first()`
+  - `nextflow.config` updated with `ref_panel` param default pointing to `assets/salas_2018_cpgs.csv`
+- **Dropped --alignment_only** from relaunch — pipeline runs through to Houseman/NMF
+- **Added kill scripts:** `bin/kill_nextflow.sh`, `bin/cancel_batch.sh`
+- **Expanded kill/cleanup section** in CLAUDE.md with 4 comprehensive copy-paste scripts
 
 ## Key Decisions
 
-- **Wave + Fusion over custom ECR images**: saves hours of Docker build time; works without Seqera token
-- **chr19 FASTQs for AWS test**: small (~1GB each), fast upload, reasonable cloud alignment time
-- **S3 genome index storeDir**: BWAMETH_INDEX now caches index to S3, reusable across cloud runs
-- **2-sample alignment-only**: validates full AWS plumbing before committing to 6-sample run
+- **BWA_METH_SKIP_TIME_CHECKS over touch** — env var is the intended escape hatch for S3/network filesystems; touch mtime on Fusion-mounted S3 is unreliable
+- **Salas 2018 over Reinius 2012** — Salas IDOL library is WGBS-optimized; Reinius is 450K array. Chr19 has only 13 Salas CpGs (below 50-CpG threshold) — chr19 is useless for Houseman
+- **4 vCPU + 24 GB for process_high on AWS** — fits r5.xlarge; CE allocation strategy is immutable on BEST_FIT CEs, can't update in-place
+- **ComBatMet will fall back on 2 samples** — single batch → raw beta fallback expected, Houseman still runs on real data
 
-## Chr19 Figures — Usable for Slides
+## Blockers / Next Steps (priority order)
 
-| Figure | Path | Use? |
-|--------|------|------|
-| NMF UMAP | `results_chr19/nmf/nmf_umap.png` | Yes |
-| Rank selection | `results_chr19/nmf/rank_selection.png` | Yes |
-| DMR manhattan | `results_chr19/region_detect/dmr_manhattan.png` | Yes — 502 regions |
-| PCA raw batch | `results_chr19/pca/pca_raw_batch.png` | Yes — batch effect visible |
-| M-bias PNGs | `results_chr19/methyldackel/*_mbias_OT/OB.png` | Yes — flat/clean |
-| fastp HTML | `results_chr19/fastp/SRR22476697_fastp.html` | Yes |
-| Cell fractions | `results_chr19/houseman/cell_fractions.png` | No — flat chr19 artifact |
-| PCA corrected condition | `results_chr19/pca/pca_corrected_condition.png` | No — no separation |
-
-## Blockers
-
-- Slides not started — highest priority
-- Fusion anonymous mode: no Seqera token, may have limitations; watch for job failures
-- Root access keys in use — should be rotated to IAM user keys before any production run
+1. **Monitor AWS run** — `tail -f nf_sle_2sample_aws.log`
+   - Watch for BWAMETH_ALIGN going RUNNING (confirms resource fix worked)
+   - If stuck RUNNABLE again: Spot capacity issue — run `cancel_batch.sh sle-pipeline-queue` then relaunch pointing at `sle-test-queue` (on-demand, guaranteed)
+2. **Build interview slides** — interview Thu Mar 12 2:30pm. Do this now.
+3. **Pull results when done** — `aws s3 sync s3://sle-methylation-pipeline/results_aws_test/ results_aws_test/`
+4. **Fix AWS Batch CE long-term** — recreate `sle-pipeline-spot` with `SPOT_CAPACITY_OPTIMIZED` allocation strategy (can't update in-place)

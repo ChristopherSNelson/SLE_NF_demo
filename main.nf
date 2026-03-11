@@ -200,7 +200,8 @@ workflow {
         // ---- Step 9: Houseman deconvolution ----
         HOUSEMAN_DECONV(
             COMBAT_METH.out.beta_matrix,
-            sample_sheet_ch.first()
+            sample_sheet_ch.first(),
+            Channel.fromPath(params.ref_panel).first()
         )
 
         // ---- Step 10: Region detection (dmrseq on raw counts) ----
