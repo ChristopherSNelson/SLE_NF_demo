@@ -1,26 +1,51 @@
-# Handoff — 2026-03-11 ~1:30am
+# Handoff — 2026-03-11 ~noon
 
 ## Active Run
-- **tmux:** `fullrun` — `tmux attach -t fullrun`
-- **PIDs:** 91471/91472 (kill with `kill -9 91471 91472` if needed)
-- **Command:** `caffeinate -i nextflow run main.nf -profile local,conda --sample_sheet samples_fullgenome.csv --genome GRCh38.primary_assembly.genome.fa --outdir results_full -resume`
-- **Status at handoff:** FASTP done (6/6 cached), BWAMETH_ALIGN just started (0/6)
-- **Monitor:** `tail -f .nextflow.log`
-- **Duration:** Unknown — no benchmark exists for bwameth on this machine at this data size. Could be 2h, could be 12h+.
+
+- **tmux:** `awsrun` — `tmux attach -t awsrun`
+- **Log:** `tail -f aws_run.log`
+- **Command:** `nextflow run main.nf -profile aws --sample_sheet samples_aws_test.csv --genome s3://sle-methylation-pipeline/input/GRCh38.primary_assembly.genome.fa --alignment_only true --outdir s3://sle-methylation-pipeline/results_aws_test`
+- **Status at handoff:** FASTP ✔ (2/2 cached), BWAMETH_INDEX building Wave container → will submit to AWS Batch
+- **Expected duration:** BWAMETH_INDEX ~2-3h, BWAMETH_ALIGN ~1-2h per sample (2 parallel)
+
+### Watch for
+- Fusion license warning ("Missing Seqera Platform access token") is expected — jobs still submit
+- If BWAMETH_INDEX fails: check `.nextflow.log` for S3 write errors on storeDir
+- If any Batch job fails: `aws s3 cp s3://sle-methylation-pipeline/work/<hash>/.command.err - --region us-east-2`
 
 ## What Was Done This Session
-- Chr19 pipeline run completed successfully — figures in `results_chr19/`
-- Fixed ComBatMet crash on sparse data: `tryCatch` fallback to raw beta in `bin/combat_meth.R`
-- Fixed MethylDackel mbias: `rsvg-convert` SVG→PNG, `librsvg` added to conda env, proper publishDir
-- Converted existing chr19 mbias SVGs to PNG manually: `results_chr19/methyldackel/`
-- Assessed chr19 figures for interview (see table below)
-- Discovered `fastq_downsampled/` files are systemically corrupted — R1/R2 read count mismatches
-- Created `samples_fullgenome.csv` using clean `fastq_chr19/` files (10M pairs) vs full genome
-- Cleaned `work/` task dirs via `bin/cleanup_work.sh` — freed 95GB, conda envs at 4.5GB preserved
-- Fixed batch assignments: 3/3 split, both conditions per batch — ComBatMet will run
-- 3 atomic commits pushed
+
+- AWS credentials fixed: expired session token replaced with root IAM access keys
+- AWS Batch hello world confirmed: on-demand and Spot instances both working
+- Fixed Spot Fleet IAM bug: `SLE-EC2FleetRole` needed `spotfleet.amazonaws.com` trust (was `ec2.amazonaws.com`)
+- Replaced custom ECR container approach with Wave + Fusion: auto-builds from conda YAMLs, no ECR needed
+- S3 data uploaded: genome + .fai + 4 FASTQs (2 samples) to `s3://sle-methylation-pipeline/input/`
+- Fixed BWAMETH_INDEX storeDir: now configurable via `params.genome_index_dir`; AWS profile sets it to S3
+- Fixed process_high memory: 6→12GB declared to match bwameth actual usage (prevents 2x concurrent thrash)
+- Fixed local executor: capped to 6 CPUs / 12GB (was 8/16, caused overnight thrashing)
+- Added `overwrite=true` to all trace/timeline/report/dag blocks (prevents resume crash)
+- FASTP confirmed running successfully on AWS Batch (~3 min, both samples)
+- Committed and relaunched pipeline in tmux `awsrun`
+
+## Next Steps (priority order)
+
+1. **BUILD SLIDES** — interview Thursday Mar 12 2:30pm (~24h away), not started
+   - Available real-data figures: chr19 results in `results_chr19/` (NMF UMAP, DMR manhattan, PCA, M-bias)
+   - Test profile figures: `results_test/` (labeled simulated, covers all downstream steps)
+   - Slide structure: motivation → DAG → QC → batch correction → cell deconv → DMR → NMF → future
+2. **Monitor AWS run** — if alignment finishes tonight, harvest bedGraphs and run downstream
+3. **Security**: delete root access keys from AWS console, create IAM user CLI keys
+4. **Downstream on AWS**: if bedGraphs land in S3, run full downstream with `--skip_alignment --bedgraph_dir s3://...`
+
+## Key Decisions
+
+- **Wave + Fusion over custom ECR images**: saves hours of Docker build time; works without Seqera token
+- **chr19 FASTQs for AWS test**: small (~1GB each), fast upload, reasonable cloud alignment time
+- **S3 genome index storeDir**: BWAMETH_INDEX now caches index to S3, reusable across cloud runs
+- **2-sample alignment-only**: validates full AWS plumbing before committing to 6-sample run
 
 ## Chr19 Figures — Usable for Slides
+
 | Figure | Path | Use? |
 |--------|------|------|
 | NMF UMAP | `results_chr19/nmf/nmf_umap.png` | Yes |
@@ -32,27 +57,8 @@
 | Cell fractions | `results_chr19/houseman/cell_fractions.png` | No — flat chr19 artifact |
 | PCA corrected condition | `results_chr19/pca/pca_corrected_condition.png` | No — no separation |
 
-## Next Steps (priority order)
-1. Morning: check `tmux attach -t fullrun` — did alignment finish?
-2. If `results_full/` complete: harvest PCA, cell fractions, NMF, DMR figures
-3. BUILD SLIDES — interview Thursday Mar 12 2:30pm, nothing started yet
-4. Slide structure suggestion:
-   - Motivation: SLE disproportionately affects underrepresented populations
-   - Pipeline architecture DAG
-   - QC: fastp + M-bias (chr19 real data)
-   - Batch correction: PCA before/after
-   - Cell deconvolution: cell fractions
-   - DMR detection: manhattan
-   - NMF stratification: rank selection + UMAP
-   - Future: 50+ samples, diverse cohort
-
-## Key Decisions
-- `fastq_chr19/` used for full-genome run — only clean balanced files available
-- `fastq_downsampled/` abandoned — systemically corrupted
-- 3/3 batch split in `samples_fullgenome.csv` — ComBatMet should run properly
-- No SVG outputs — mbias converted to PNG via rsvg-convert
-
 ## Blockers
-- Alignment time unknown — may not finish before Thursday afternoon
-- Fallback: chr19 figures + test profile figures (labeled simulated) cover all slide slots
-- Claude usage ~77% weekly limit — may need Gemini for slide session
+
+- Slides not started — highest priority
+- Fusion anonymous mode: no Seqera token, may have limitations; watch for job failures
+- Root access keys in use — should be rotated to IAM user keys before any production run
