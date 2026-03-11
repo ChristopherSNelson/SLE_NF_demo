@@ -1,7 +1,8 @@
 process METHYLDACKEL {
     label 'process_medium'
     conda "${projectDir}/envs/methyldackel.yml"
-    publishDir "${params.outdir}/methyldackel", mode: 'copy'
+    publishDir "${params.outdir}/methyldackel", mode: 'copy', pattern: "*.bedGraph"
+    publishDir "${params.outdir}/methyldackel/mbias", mode: 'copy', pattern: "*_mbias_*.png"
 
     input:
     tuple val(sample_id), path(aln), path(aln_idx)
@@ -9,8 +10,9 @@ process METHYLDACKEL {
     path fasta_fai
 
     output:
-    tuple val(sample_id), path("${sample_id}_CpG.bedGraph"), emit: bedgraph
-    tuple val(sample_id), path("${sample_id}_mbias.txt"),    emit: mbias
+    tuple val(sample_id), path("${sample_id}_CpG.bedGraph"),  emit: bedgraph
+    tuple val(sample_id), path("${sample_id}_mbias_OT.png"),  emit: mbias_ot
+    tuple val(sample_id), path("${sample_id}_mbias_OB.png"),  emit: mbias_ob
 
     script:
     """
@@ -29,9 +31,8 @@ process METHYLDACKEL {
         mv ${sample_id}.bedGraph ${sample_id}_CpG.bedGraph
     fi
 
-    # Collect mbias outputs into single file
-    if [ ! -f "${sample_id}_mbias.txt" ]; then
-        cat ${sample_id}_mbias*.txt > ${sample_id}_mbias.txt 2>/dev/null || touch ${sample_id}_mbias.txt
-    fi
+    # Convert mbias SVGs to PNG
+    rsvg-convert -f png -o ${sample_id}_mbias_OT.png ${sample_id}_mbias_OT.svg
+    rsvg-convert -f png -o ${sample_id}_mbias_OB.png ${sample_id}_mbias_OB.svg
     """
 }
