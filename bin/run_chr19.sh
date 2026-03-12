@@ -36,7 +36,7 @@ ls -lh fastq_chr19/
 # Step 3: Run Nextflow pipeline
 echo ">>> Starting Nextflow..."
 caffeinate -i nextflow run main.nf -profile local,conda \
-    --sample_sheet samples_chr19.csv \
+    --sample_sheet sampleSheets/samples_chr19.csv \
     --genome chr19.fa \
     --min_depth 1 \
     --outdir results_chr19 \
