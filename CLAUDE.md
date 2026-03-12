@@ -624,6 +624,7 @@ Append-only log of corrections — propose an entry after any mistake. Format: `
 - 2026-03-11 | AWS Batch CE created with default allocationStrategy (BEST_FIT) — immutable, can't update in-place, jobs stuck RUNNABLE when Spot unavailable | Always create Spot CEs with `SPOT_CAPACITY_OPTIMIZED`; to fix existing CE must disable → recreate → update job queue
 - 2026-03-11 | AWS Spot Fleet role trust policy used `ec2.amazonaws.com` instead of `spotfleet.amazonaws.com` | Spot Fleet requires `spotfleet.amazonaws.com` as the trusted service principal
 - 2026-03-11 | Bioconductor runtime install fails on AWS Wave container — zlib.h not found when compiling Rhtslib/Rhdf5lib/RCurl | Add `conda-forge::zlib` to r_methylation.yml; Wave containers are minimal and don't include zlib dev headers by default
+- 2026-03-11 | Rhtslib compilation fails in Wave container — lzma.h not found, cascading to Rsamtools → rtracklayer → BSgenome → bsseq → dmrseq all failing | Add `conda-forge::xz` and `conda-forge::bzip2` to r_methylation.yml; htslib needs all three: zlib, xz/lzma, bzip2
 
 ## Git Commit Conventions
 
