@@ -10,13 +10,15 @@ process NMF_STRATIFY {
     path dmr_bed
 
     output:
-    path "nmf_clusters.tsv",      optional: true, emit: clusters
-    path "W_matrix.tsv",          optional: true, emit: w_matrix
-    path "H_matrix.tsv",          optional: true, emit: h_matrix
-    path "rank_selection.png",    optional: true, emit: rank_plot
-    path "nmf_umap.png",          optional: true, emit: umap_plot
-    path "stability_loo.tsv",     optional: true, emit: loo_stability
-    path "clinical_correlations.tsv", emit: clinical_corr, optional: true
+    path "nmf_clusters.tsv",           optional: true, emit: clusters
+    path "W_matrix.tsv",               optional: true, emit: w_matrix
+    path "H_matrix.tsv",               optional: true, emit: h_matrix
+    path "rank_selection.png",         optional: true, emit: rank_plot
+    path "H_matrix_nmf_ordered.png",   optional: true, emit: heatmap_ordered
+    path "H_matrix_clustered.png",     optional: true, emit: heatmap_clustered
+    path "H_matrix_unclustered.png",   optional: true, emit: heatmap_unclustered
+    path "stability_loo.tsv",          optional: true, emit: loo_stability
+    path "clinical_correlations.tsv",  optional: true, emit: clinical_corr
 
     script:
     def cell_arg = cell_fractions.name != 'NO_CELL_FRACTIONS' ? "--cell_fractions ${cell_fractions}" : ''
@@ -33,5 +35,8 @@ process NMF_STRATIFY {
         ${dmr_arg} \\
         ${clinical_arg} \\
         --outdir .
+    if [ -f nmf_clusters.tsv ] && [ -f H_matrix.tsv ]; then
+        generate_nmf_heatmaps.py --h_matrix H_matrix.tsv --clusters nmf_clusters.tsv --outdir .
+    fi
     """
 }

@@ -377,35 +377,6 @@ def plot_rank_selection(results, outdir):
     plt.close('all')
 
 
-def plot_umap(H, assignments, samples, outdir):
-    """UMAP visualization of H matrix colored by cluster."""
-    try:
-        from umap import UMAP
-        reducer = UMAP(n_components=2, random_state=42, n_neighbors=min(5, H.shape[1] - 1))
-        embedding = reducer.fit_transform(H.T)
-    except (ImportError, Exception):
-        from sklearn.decomposition import PCA
-        n_comp = min(2, H.shape[0], H.shape[1])
-        pca = PCA(n_components=n_comp)
-        embedding = pca.fit_transform(H.T)
-
-    plot_df = pd.DataFrame({
-        'UMAP1': embedding[:, 0],
-        'UMAP2': embedding[:, 1],
-        'Cluster': [str(a) for a in assignments],
-        'sample_id': samples
-    })
-
-    fig, ax = plt.subplots(figsize=(7, 5))
-    sns.scatterplot(data=plot_df, x='UMAP1', y='UMAP2', hue='Cluster',
-                    palette='Set2', s=80, edgecolor='k', linewidth=0.5, ax=ax)
-    for _, row in plot_df.iterrows():
-        ax.annotate(row['sample_id'], (row['UMAP1'], row['UMAP2']),
-                    fontsize=7, alpha=0.7, ha='center', va='bottom')
-    ax.set_title('NMF Patient Clusters (UMAP)')
-    fig.savefig(os.path.join(outdir, 'nmf_umap.png'), dpi=150, bbox_inches='tight')
-    plt.close()
-
 
 def main():
     args = parse_args()
@@ -491,7 +462,6 @@ def main():
 
     # Plots
     plot_rank_selection(results, args.outdir)
-    plot_umap(best['H'], best['assignments'], mval_df.columns.tolist(), args.outdir)
 
     # Summary
     print(f"\n=== NMF Summary ===")
