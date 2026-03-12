@@ -11,7 +11,7 @@ suppressPackageStartupMessages({
 })
 
 # Auto-install dmrseq + bsseq from Bioconductor if not available
-# (conda can't resolve these for osx-arm64; Docker image has them pre-built)
+# (conda solver can't satisfy dmrseq's version-pinned dep chain on any platform)
 if (!requireNamespace("dmrseq", quietly = TRUE) ||
     !requireNamespace("bsseq", quietly = TRUE)) {
   cat("Installing dmrseq + bsseq from Bioconductor...\n")

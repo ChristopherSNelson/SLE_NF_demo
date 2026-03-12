@@ -302,7 +302,7 @@ SLE_NF_demo/
 - Builds BSseq object from bedGraph files, runs dmrseq with batch as `adjustCovariate`
 - Produces variable-width DMRs with permutation-based p-values
 - REGION_DETECT runs in parallel with COMBAT_METH (both take raw bedGraphs)
-- dmrseq + bsseq installed from Bioconductor at runtime (conda can't resolve for osx-arm64)
+- dmrseq + bsseq installed from Bioconductor at runtime (conda solver can't satisfy dmrseq's version-pinned dependency chain on any platform; BiocManager handles it)
 - GRanges output converted to plain data.frame to avoid S4 method dispatch issues
 - Output: candidate DMR BED file + window_results.tsv + manhattan plot
 
@@ -534,7 +534,7 @@ Test command: `nextflow run main.nf -profile test,conda`
 ### COMPLETED
 - [x] dmrseq (Korthauer 2019) for DMR detection — replaced Python sliding window
 - [x] REGION_DETECT takes raw bedGraphs, runs parallel with COMBAT_METH
-- [x] dmrseq + bsseq auto-installed from Bioconductor at runtime (conda can't resolve arm64)
+- [x] dmrseq + bsseq auto-installed from Bioconductor at runtime (conda solver can't satisfy version-pinned deps on any platform)
 - [x] GRanges S4 output bug fixed (extract mcols manually into base data.frame)
 - [x] fasterq-dump APFS disk-limit fix (prefetch + fasterq-dump on local .sra file)
 - [x] Input validation: sample sheet columns + genome file existence

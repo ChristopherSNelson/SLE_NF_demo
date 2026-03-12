@@ -24,8 +24,11 @@ dependencies:
   - conda-forge::r-aod
   - conda-forge::r-rcpparmadillo
   # dmrseq dependencies (dmrseq itself installed from Bioconductor at runtime)
-  # zlib required for Rhtslib/Rhdf5lib/RCurl source compilation on Linux (AWS Wave containers)
+  # Rhtslib (htslib R wrapper) needs zlib, xz (lzma), and bzip2 dev headers for source compilation
+  # Wave containers are minimal — these aren't included by default
   - conda-forge::zlib
+  - conda-forge::xz
+  - conda-forge::bzip2
   - bioconda::bioconductor-biocgenerics
   - bioconda::bioconductor-genomicranges
   - bioconda::bioconductor-biocparallel
