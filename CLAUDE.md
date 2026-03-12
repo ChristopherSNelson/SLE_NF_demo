@@ -215,8 +215,11 @@ Local FASTQs ──────────────────┘          
 SLE_NF_demo/
 ├── main.nf                     # Entry workflow, channel wiring
 ├── nextflow.config             # Params, profiles (test, conda, aws), resource defaults
-├── samples_single.csv          # Single-sample CSV for alignment testing
-├── samples_full.csv            # Full 11-sample SRP410780 cohort
+├── sampleSheets/               # All sample sheet CSVs
+│   ├── samples_single.csv      # Single-sample CSV for alignment testing
+│   ├── samples_full.csv        # Full 11-sample SRP410780 cohort
+│   ├── samples_chr19.csv       # 6-sample subset for local/AWS runs
+│   └── samples_aws_test.csv    # 2-sample smoke-test for AWS
 ├── modules/
 │   ├── fetch_sra.nf
 │   ├── fastp.nf                # QC + trimming (replaces fastqc + trim_galore)

@@ -134,7 +134,7 @@ Resume is on by default (`resume = true` in `nextflow.config`). Completed tasks 
 
 Validation cohort: [SRP410780](https://www.ncbi.nlm.nih.gov/sra/?term=SRP410780) — 11 whole-genome bisulfite sequencing samples (4 SLE, 3 Sjogren's, 4 healthy controls).
 
-The active workflow uses pre-subsampled FASTQs (~10 M read pairs/sample) stored in `fastq_chr19/`. A 6-sample subset (`samples_chr19.csv`) with 3 SLE + 3 Control balanced across 2 batches is used for full cohort runs. To re-enable SRA streaming, uncomment `FETCH_SRA` in `main.nf`.
+The active workflow uses pre-subsampled FASTQs (~10 M read pairs/sample) stored in `fastq_chr19/`. A 6-sample subset (`sampleSheets/samples_chr19.csv`) with 3 SLE + 3 Control balanced across 2 batches is used for full cohort runs. To re-enable SRA streaming, uncomment `FETCH_SRA` in `main.nf`.
 
 This dataset validates all code paths but is underpowered for biological discovery (n=11). The goal is to expand to 50+ samples across diverse ethnicities — SLE disproportionately affects Black, Hispanic, and Asian populations, and cohort composition must reflect this.
 

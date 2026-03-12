@@ -100,7 +100,7 @@ aws s3 cp GRCh38.primary_assembly.genome.fa s3://sle-methylation-pipeline/input/
 aws s3 cp GRCh38.primary_assembly.genome.fa.fai s3://sle-methylation-pipeline/input/
 
 # Upload sample sheet
-aws s3 cp samples_full.csv s3://sle-methylation-pipeline/input/
+aws s3 cp sampleSheets/samples_full.csv s3://sle-methylation-pipeline/input/
 ```
 
 ## Step 6: Launch Nextflow Head Node (t3.medium EC2)
