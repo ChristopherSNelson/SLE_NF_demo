@@ -1,5 +1,5 @@
 process REGION_DETECT {
-    label 'process_medium'
+    label 'process_high'
     conda "${projectDir}/envs/r_methylation.yml"
     publishDir "${params.outdir}/region_detect", mode: 'copy'
 
