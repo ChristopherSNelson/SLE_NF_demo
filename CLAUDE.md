@@ -627,6 +627,7 @@ Append-only log of corrections — propose an entry after any mistake. Format: `
 - 2026-03-11 | Rhtslib compilation fails in Wave container — lzma.h not found, cascading to Rsamtools → rtracklayer → BSgenome → bsseq → dmrseq all failing | Add `conda-forge::xz` and `conda-forge::bzip2` to r_methylation.yml; htslib needs all three: zlib, xz/lzma, bzip2
 - 2026-03-12 | NMF_STRATIFY crashes with `max() arg is an empty sequence` on 2-sample run — `k_max` capped to `n_samples-1=1` which is below `k_min=2`, leaving `results{}` empty | Exit 0 with warning when `n_samples < k_min + 1`; mark all NMF outputs `optional: true` in module (NMF is a terminal node — nothing downstream consumes its output)
 - 2026-03-12 | AWS run fails with "Cannot store Conda environments to a remote work directory" — base `conda` profile sets `conda.enabled = true` globally, which bleeds into the `aws` profile; Nextflow tries to write conda envs to S3 workDir | Add `conda.enabled = false` inside the `aws` profile block; Wave handles container builds from conda YAMLs, local conda is not needed
+- 2026-03-12 | The pipeline has errorStrategy = 'retry' with exit codes 137/143 for this, but Spot terminations via AWS come through as a host-level kill rather than a clean signal, so it may not have caught it.| retry on null also  errorStrategy = { task.exitStatus in [137, 143, 247] || task.exitStatus == null ? 'retry' : 'finish' } 
 
 ## Git Commit Conventions
 

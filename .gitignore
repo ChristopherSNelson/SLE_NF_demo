@@ -26,3 +26,8 @@ fastq_downsampled/
 # Misc
 *.log
 *Screenshot*.png
+*.pdf
+aws_*/
+biomni_lupus_outfiles/
+fastq_chr19/
+mock_results/
