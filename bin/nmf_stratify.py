@@ -442,6 +442,11 @@ def main():
 
     print(f"Using {data.shape[0]} features x {data.shape[1]} samples for NMF")
 
+    n_samples = data.shape[1]
+    if n_samples < args.k_min + 1:
+        print(f"\nWARNING: Only {n_samples} samples — NMF requires >= {args.k_min + 1}. Skipping.")
+        import sys; sys.exit(0)
+
     # Run NMF sweep
     results = run_nmf_sweep(data, args.k_min, args.k_max, args.n_runs)
 

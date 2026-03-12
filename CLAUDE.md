@@ -625,6 +625,7 @@ Append-only log of corrections — propose an entry after any mistake. Format: `
 - 2026-03-11 | AWS Spot Fleet role trust policy used `ec2.amazonaws.com` instead of `spotfleet.amazonaws.com` | Spot Fleet requires `spotfleet.amazonaws.com` as the trusted service principal
 - 2026-03-11 | Bioconductor runtime install fails on AWS Wave container — zlib.h not found when compiling Rhtslib/Rhdf5lib/RCurl | Add `conda-forge::zlib` to r_methylation.yml; Wave containers are minimal and don't include zlib dev headers by default
 - 2026-03-11 | Rhtslib compilation fails in Wave container — lzma.h not found, cascading to Rsamtools → rtracklayer → BSgenome → bsseq → dmrseq all failing | Add `conda-forge::xz` and `conda-forge::bzip2` to r_methylation.yml; htslib needs all three: zlib, xz/lzma, bzip2
+- 2026-03-12 | NMF_STRATIFY crashes with `max() arg is an empty sequence` on 2-sample run — `k_max` capped to `n_samples-1=1` which is below `k_min=2`, leaving `results{}` empty | Exit 0 with warning when `n_samples < k_min + 1`; mark all NMF outputs `optional: true` in module (NMF is a terminal node — nothing downstream consumes its output)
 
 ## Git Commit Conventions
 

@@ -10,12 +10,12 @@ process NMF_STRATIFY {
     path dmr_bed
 
     output:
-    path "nmf_clusters.tsv",      emit: clusters
-    path "W_matrix.tsv",          emit: w_matrix
-    path "H_matrix.tsv",          emit: h_matrix
-    path "rank_selection.png",    emit: rank_plot
-    path "nmf_umap.png",         emit: umap_plot
-    path "stability_loo.tsv",    emit: loo_stability
+    path "nmf_clusters.tsv",      optional: true, emit: clusters
+    path "W_matrix.tsv",          optional: true, emit: w_matrix
+    path "H_matrix.tsv",          optional: true, emit: h_matrix
+    path "rank_selection.png",    optional: true, emit: rank_plot
+    path "nmf_umap.png",          optional: true, emit: umap_plot
+    path "stability_loo.tsv",     optional: true, emit: loo_stability
     path "clinical_correlations.tsv", emit: clinical_corr, optional: true
 
     script:
