@@ -1,7 +1,7 @@
-# Session Handoff — 2026-03-11 evening
+# Session Handoff — 2026-03-11 (updated)
 
 ## Active Pipeline Run
-- **PID:** 11315 (Nextflow JVM) — running in tmux
+- **PIDs:** 13932 (NF JVM), 13933 (caffeinate wrapper) — launched 18:47
 - **Command:** `nextflow run main.nf -profile aws -resume --sample_sheet samples_aws_test.csv --genome s3://sle-methylation-pipeline/input/GRCh38.primary_assembly.genome.fa --outdir s3://sle-methylation-pipeline/results_aws_test`
 - **Samples:** SRR22476697 (SLE) + SRR22476701 (Control), full pipeline (no --alignment_only)
 - **Log:** `nf_sle_2sample_aws.log`
