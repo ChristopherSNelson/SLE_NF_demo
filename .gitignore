@@ -1,33 +1,49 @@
+# Nextflow runtime
 work/
-results/
-results_test/
-test_data/
 .nextflow/
 .nextflow.log*
-trace-*.txt
-timeline-*.html
-report-*.html
-dag-*.svg
-*.pyc
-__pycache__/
-.DS_Store
-*.pages
-nf_run.log
-# Reference genomes and indices (too large for git)
-*.fa
-*.fa.fai
-*.fa.gz
-# Run-specific results
-results_*/
-# Persistent caches (storeDir)
-fastq_cache/
-genome_index/
-fastq_downsampled/
-# Misc
-*.log
-*Screenshot*.png
-*.pdf
+.nextflow.pid
+
+# Pipeline outputs
+results*/
 aws_*/
-biomni_lupus_outfiles/
-fastq_chr19/
+
+# Large reference / index files
+*.fa
+*.fasta
+*.fai
+genome_index/
+
+# Raw sequencing data
+*.fastq.gz
+*.fastq
+*.bam
+*.bai
+*.cram
+*.crai
+*.sra
+fastq_*/
+fastq_cache/
+
+# Stray result files (keep locally but don't track)
+candidate_dmrs.bed
+cell_fractions.tsv
+mvalues_corrected.tsv
+
+# Personal / presentation files
+*.key
+*.pdf
+*.pages
+interview_cheatsheet.txt
+
+# Run logs and screenshots
+*.log
+*.png
+
+# Generated test data and mock outputs
+test_data/
 mock_results/
+biomni_lupus_outfiles/
+
+# macOS
+.DS_Store
