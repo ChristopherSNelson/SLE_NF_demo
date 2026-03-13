@@ -1,0 +1,10 @@
+sample_id,fastq_1,fastq_2,condition,batch
+SRR22476695,,,Sjogrens,batch1
+SRR22476696,,,Sjogrens,batch1
+SRR22476697,,,SLE,batch1
+SRR22476698,,,SLE,batch1
+SRR22476700,,,SLE,batch2
+SRR22476701,,,Control,batch2
+SRR22476703,,,Sjogrens,batch2
+SRR22476704,,,Control,batch1
+SRR22476705,,,Control,batch1
