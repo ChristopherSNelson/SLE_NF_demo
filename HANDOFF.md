@@ -1,39 +1,42 @@
-# Handoff — 2026-03-12 (late session)
+# Session Handoff — 2026-03-13
 
 ## What was done this session
 
-- Diagnosed NMF_STRATIFY crash on AWS: `samples_chr19.csv` was staged from old root path after file was moved to `sampleSheets/` — file no longer existed at that path.
-- Fixed `bin/run_chr19.sh` to use `sampleSheets/samples_chr19.csv`.
-- Attempted cache-preserving AWS resume (symlink + `-resume serene_meucci`) — did not work; cache invalidated because CSV content changed when paths inside it were updated during the move.
-- Ran NMF_STRATIFY locally using completed S3 outputs (mvalues_corrected.tsv, cell_fractions.tsv, candidate_dmrs.bed already in `results_6sample/`).
-- Ran `bin/generate_nmf_heatmaps.py` on local NMF output.
-- Synced all `results_6sample/` from S3 (excluding CRAMs) + uploaded NMF results back to S3.
-- 6-sample run is now complete end-to-end locally and on S3.
+- Generated two manhattan plot scripts from chr19 window_results.tsv (502 dmrseq regions):
+  - `bin/plot_custom_manhattan.R` — single-chr position plot for slides
+  - `bin/plot_manhattan_all.R` — full plot showing all regions colored by direction (hyper/hypo) and alpha-coded by significance tier; saved to `results_6sample/region_detect/dmr_manhattan_all.png`
+- Verified 6-sample AWS run results are complete and local in `results_6sample/`
+  - NMF: perfect SLE/Control separation (cluster 0=Control, cluster 1=SLE)
+  - Cell fractions: all NA (expected — sparse coverage)
+  - DMRs: 0 from 6-sample run (bedgraphs too sparse); manhattan uses chr19 run data
+- Re-enabled FETCH_SRA in `main.nf`; SRR-accession rows now download and merge with local FASTQs
+- Created `sampleSheets/samples_sjogrens_align.csv` — 3 Sjogren's samples (695, 696, 703) for alignment-only AWS run
+- Created `sampleSheets/samples_9sample_downstream.csv` — 9-sample metadata sheet for skip_alignment downstream run
+- Created `bin/run_full_cohort_aws.sh` — two-phase script: Phase 1 aligns Sjogrens, Phase 2 consolidates bedgraphs + runs full downstream
+- Cleanup:
+  - Nuked S3 bucket (225 GB deleted, bucket now empty)
+  - Deleted local large files: work/ (27 GB), genome_index/ (28 GB), fastq_chr19/ (11 GB), fastq_downsampled/ (32 GB), results_chr19/ (7.9 GB), aws_2sample_successful_031226/ (2.4 GB), GRCh38.primary_assembly.genome.fa (2.9 GB)
+  - Repo is now 118 MB
+  - Added .gitignore covering work/, results*/, fastq_*/, *.fa, *.fastq.gz, *.key, *.log, *.png, *.pdf, *.pages, test_data/, mock_results/
+  - Removed blank dmr_manhattan.png (0 regions); kept the two good ones
 
-## Active Pipeline Run
+## What's left / next steps (priority order)
 
-No active Nextflow processes at session close.
+1. Clean up remaining stray local results dirs: results_full/, results_test/, results_single*/, results/ (~14 MB, already gitignored)
+2. If re-running pipeline: download Sjogren's FASTQs, upload to S3, run Phase 1 alignment then Phase 2 downstream via bin/run_full_cohort_aws.sh
+3. For real biological results: expand to 50+ samples across diverse ethnicities
 
-## What's Left (priority order)
+## Key decisions made
 
-1. Verify cell fractions are real (non-NA) in `results_6sample/houseman/cell_fractions.tsv`
-2. Pre-upload `fastq_chr19/` to S3; update `sampleSheets/samples_chr19.csv` paths to S3 before next AWS run:
-   ```bash
-   aws s3 cp fastq_chr19/ s3://sle-methylation-pipeline/input/fastq_chr19/ --recursive --region us-east-2
-   ```
-3. Delete S3 `work/` (66 GB) — run is confirmed complete
-4. Recreate `sle-pipeline-spot` CE with `SPOT_CAPACITY_OPTIMIZED` (current `BEST_FIT` is immutable — disable → recreate → update job queue)
-5. Security: delete root AWS access keys, create IAM user CLI keys
-6. Add MultiQC summary step
-7. CI/CD: GitHub Actions for test profile
+- Accepted toy demo scope — no full-WGBS AWS run; n=11 subsampled data is sufficient to demonstrate the pipeline
+- Kept AWS Batch infrastructure (CEs + job queues) — free when idle
+- S3 bucket emptied but not deleted — retains bucket name for future runs
+- Manhattan plot uses chr19 window_results (502 regions, same 6 samples) since whole-genome bedgraphs were too sparse for dmrseq
 
-## Key Decisions
+## Current blockers
 
-- Gave up on AWS cache resume: moving sample sheets + updating paths inside CSVs invalidates Nextflow fingerprints. Not worth restoring; results already obtained locally.
-- NMF run locally instead of on AWS — outputs uploaded back to S3 to keep `results_6sample/` complete there.
+None. Repo is clean and pushed.
 
-## Current Blockers
+## Active pipeline runs
 
-- `sle-pipeline-spot` allocationStrategy immutable — low risk, fix when convenient
-- Root AWS access keys still active — security risk, fix before any public demo
-- Next AWS run will need S3 FASTQ paths in `sampleSheets/samples_chr19.csv` to avoid repeat of path-resolution issues
+None (confirmed via pgrep).

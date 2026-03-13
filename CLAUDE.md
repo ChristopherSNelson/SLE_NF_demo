@@ -632,6 +632,7 @@ Append-only log of corrections — propose an entry after any mistake. Format: `
 - 2026-03-12 | AWS run fails with "Cannot store Conda environments to a remote work directory" — base `conda` profile sets `conda.enabled = true` globally, which bleeds into the `aws` profile; Nextflow tries to write conda envs to S3 workDir | Add `conda.enabled = false` inside the `aws` profile block; Wave handles container builds from conda YAMLs, local conda is not needed
 - 2026-03-12 | The pipeline has errorStrategy = 'retry' with exit codes 137/143 for this, but Spot terminations via AWS come through as a host-level kill rather than a clean signal, so it may not have caught it.| retry on null also  errorStrategy = { task.exitStatus in [137, 143, 247] || task.exitStatus == null ? 'retry' : 'finish' }
 - 2026-03-12 | Moving sample sheets to `sampleSheets/` and updating FASTQ paths inside CSVs invalidated Nextflow cache for all downstream processes — symlink trick did not restore fingerprints | When moving sample sheets, FASTQ paths inside the CSV are part of the fingerprint; changing them forces full re-run. Fix: use S3 paths in sample sheets for AWS runs so local file moves don't matter
+- 2026-03-13 | Issued `rm -rf results_chr19/` before user's "keep plots" message arrived — user message came in mid-execution | For destructive deletions, check for in-flight user messages before running rm on dirs with irreplaceable outputs; prefer moving to trash over rm -rf when content value is unclear
 
 ## Git Commit Conventions
 
