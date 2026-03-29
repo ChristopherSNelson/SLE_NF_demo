@@ -2,14 +2,15 @@
 
 ## What was done
 - Added MIT LICENSE file
-- Added 6-sample AWS success screenshot to git (force-added past *.png gitignore; filename had hidden Unicode non-breaking spaces)
+- Added 6-sample AWS success screenshot to git (force-added past *.png gitignore)
+- Renamed screenshot from goofy Unicode filename to `screenshots/6sampleSuccess.png` (non-breaking spaces broke GitHub rendering)
 - Updated README.md to match current state:
   - License: TBD -> MIT
-  - Screenshot placed under "Crash Recovery and Resumption" section (80% width)
-  - NMF + UMAP -> NMF (heatmaps replaced UMAP in prior session)
-  - Removed stale "FETCH_SRA disabled" notes (re-enabled in prior session)
+  - Screenshot under "Crash Recovery and Resumption" with caption "Example successful run with retried steps"
+  - DAG image: 75%, screenshot: 55%
+  - NMF + UMAP -> NMF (heatmaps replaced UMAP)
+  - Removed stale "FETCH_SRA disabled" notes
   - Removed reference to pre-subsampled fastq_chr19/ directory
-  - DAG image resized to 50% width
 
 ## Next steps (priority order)
 1. Re-run overnight single-sample alignment (SRR22476697) - index cached
@@ -20,7 +21,7 @@
 
 ## Key decisions
 - MIT license chosen
-- Screenshot placed under crash recovery section (matches content - shows AWS run completing after crash/resume)
+- Screenshot placed under crash recovery section (matches content)
 
 ## Blockers
 - None
