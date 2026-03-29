@@ -6,7 +6,7 @@ FASTQ → alignment → methylation calling → batch correction → cell deconv
 
 ## Pipeline DAG
 
-![Pipeline DAG](docs/dag.png)
+<img src="docs/dag.png" alt="Pipeline DAG" width="50%">
 
 ## Pipeline Stages
 
@@ -21,7 +21,7 @@ FASTQ → alignment → methylation calling → batch correction → cell deconv
 | PCA | R/ggplot2 | Raw and corrected PCA plots by batch and condition |
 | Cell deconvolution | Houseman/quadprog | Blood cell type fraction estimation (Salas 2018 IDOL reference) |
 | DMR detection | dmrseq | Count-level DMR detection with permutation p-values (Korthauer 2019) |
-| Patient stratification | NMF + UMAP | Unsupervised subtype discovery with rank selection, LOO stability, cell-type regression |
+| Patient stratification | NMF | Unsupervised subtype discovery with rank selection, LOO stability, cell-type regression |
 
 ## Prerequisites
 
@@ -109,7 +109,7 @@ SRR22476697,/data/SRR22476697_1.fastq.gz,/data/SRR22476697_2.fastq.gz,SLE,batch1
 SRR22476701,/data/SRR22476701_1.fastq.gz,/data/SRR22476701_2.fastq.gz,control,batch1
 ```
 
-SRA accession rows are supported: set `fastq_1` to the SRR ID and leave `fastq_2` empty. Both modes can be mixed. Note: `FETCH_SRA` is currently disabled in `main.nf` — the active workflow uses pre-subsampled local FASTQs.
+SRA accession rows are supported: set `fastq_1` to the SRR ID and leave `fastq_2` empty. Both modes can be mixed. SRR rows are auto-detected and routed through `FETCH_SRA`; local rows go straight to QC.
 
 ## Output Structure
 
@@ -122,7 +122,7 @@ results/
 ├── pca/                    # 4 PNGs: {raw,corrected} × {batch,condition}
 ├── houseman/               # Cell type fraction TSV + bar plot
 ├── region_detect/          # Candidate DMR BED + manhattan plot
-├── nmf/                    # Cluster TSV, W/H matrices, rank selection, UMAP, LOO stability
+├── nmf/                    # Cluster TSV, W/H matrices, rank selection, heatmaps, LOO stability
 └── pipeline_info/          # Nextflow timeline, report, trace.txt, DAG
 ```
 
@@ -130,11 +130,13 @@ results/
 
 Resume is on by default (`resume = true` in `nextflow.config`). Completed tasks are fingerprinted and skipped on re-run. Processes retry up to 3 times on exit codes 137 (OOM), 143 (SIGTERM), 247 (OOM), or null (Spot host termination). Each retry doubles memory and adds CPUs.
 
+<img src="screenshots/6 sample whole genome success aws Screenshot 2026-03-12 at 7.29.05 PM.png" alt="6-sample AWS Batch run completing after crash and resumption" width="80%">
+
 ## Dataset
 
 Validation cohort: [SRP410780](https://www.ncbi.nlm.nih.gov/sra/?term=SRP410780) — 11 whole-genome bisulfite sequencing samples (4 SLE, 3 Sjogren's, 4 healthy controls).
 
-The active workflow uses pre-subsampled FASTQs (~10 M read pairs/sample) stored in `fastq_chr19/`. A 6-sample subset (`sampleSheets/samples_chr19.csv`) with 3 SLE + 3 Control balanced across 2 batches is used for full cohort runs. To re-enable SRA streaming, uncomment `FETCH_SRA` in `main.nf`.
+A 6-sample subset (`sampleSheets/samples_chr19.csv`) with 3 SLE + 3 Control balanced across 2 batches is used for local runs. The full 11-sample cohort (4 SLE, 3 Sjogren's, 4 Control) is available via `sampleSheets/samples_full.csv`.
 
 This dataset validates all code paths but is underpowered for biological discovery (n=11). The goal is to expand to 50+ samples across diverse ethnicities — SLE disproportionately affects Black, Hispanic, and Asian populations, and cohort composition must reflect this.
 
@@ -205,4 +207,4 @@ Together, the two tools form a full QC → analysis workflow for autoimmune WGBS
 
 ## License
 
-TBD
+MIT
