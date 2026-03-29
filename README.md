@@ -1,5 +1,7 @@
 # SLE Methylation Pipeline
 
+**I built this in 5 days as a demo of methylation analysis running on Nextflow on AWS Spot instances.**
+
 End-to-end Nextflow DSL2 pipeline for Systemic Lupus Erythematosus (SLE) bisulfite sequencing analysis.
 
 FASTQ → alignment → methylation calling → batch correction → cell deconvolution → DMR detection → patient stratification
