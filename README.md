@@ -6,7 +6,7 @@ FASTQ → alignment → methylation calling → batch correction → cell deconv
 
 ## Pipeline DAG
 
-<img src="docs/dag.png" alt="Pipeline DAG" width="50%">
+<img src="docs/dag.png" alt="Pipeline DAG" width="75%">
 
 ## Pipeline Stages
 
@@ -130,7 +130,7 @@ results/
 
 Resume is on by default (`resume = true` in `nextflow.config`). Completed tasks are fingerprinted and skipped on re-run. Processes retry up to 3 times on exit codes 137 (OOM), 143 (SIGTERM), 247 (OOM), or null (Spot host termination). Each retry doubles memory and adds CPUs.
 
-<img src="screenshots/6sampleSuccess.png" alt="6-sample AWS Batch run completing after crash and resumption" width="80%">
+<img src="screenshots/6sampleSuccess.png" alt="6-sample AWS Batch run completing after crash and resumption" width="55%">
 
 ## Dataset
 
