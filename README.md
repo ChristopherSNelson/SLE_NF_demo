@@ -130,7 +130,9 @@ results/
 
 Resume is on by default (`resume = true` in `nextflow.config`). Completed tasks are fingerprinted and skipped on re-run. Processes retry up to 3 times on exit codes 137 (OOM), 143 (SIGTERM), 247 (OOM), or null (Spot host termination). Each retry doubles memory and adds CPUs.
 
-<img src="screenshots/6sampleSuccess.png" alt="6-sample AWS Batch run completing after crash and resumption" width="55%">
+<img src="screenshots/6sampleSuccess.png" alt="Example successful run with retried steps" width="55%">
+
+*Example successful run with retried steps*
 
 ## Dataset
 
